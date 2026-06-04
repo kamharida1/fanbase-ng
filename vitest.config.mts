@@ -1,0 +1,89 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "vitest/config";
+
+const root = path.dirname(fileURLToPath(import.meta.url));
+
+/** Modules with unit/integration tests — ≥80% threshold applies here. */
+const coverageInclude = [
+  "config/env.ts",
+  "lib/utils.ts",
+  "lib/logger.ts",
+  "lib/request-id.ts",
+  "lib/rate-limit.ts",
+  "lib/rate-limit-http.ts",
+  "lib/audit/log.ts",
+  "lib/observability/sentry.ts",
+  "lib/security/api-origin.ts",
+  "lib/security/cron-auth.ts",
+  "lib/security/cron-auth-edge.ts",
+  "lib/security/object-key.ts",
+  "lib/security/payment-amount.ts",
+  "lib/security/postgrest-search.ts",
+  "lib/security/safe-url.ts",
+  "lib/auth/paths.ts",
+  "lib/auth/rbac.ts",
+  "lib/auth/errors.ts",
+  "lib/auth/constants.ts",
+  "lib/feed/cursor.ts",
+  "lib/feed/errors.ts",
+  "lib/feed/constants.ts",
+  "lib/feed/queries.ts",
+  "lib/paystack/parse.ts",
+  "lib/paystack/verify.ts",
+  "lib/paystack/idempotency.ts",
+  "lib/paystack/types.ts",
+  "lib/payments/ppv-processor.ts",
+  "lib/creators/format.ts",
+  "lib/creators/schemas.ts",
+  "lib/wallets/fees.ts",
+  "lib/wallets/format.ts",
+  "lib/wallets/constants.ts",
+  "lib/wallets/schemas.ts",
+  "lib/subscriptions/period.ts",
+  "lib/subscriptions/format.ts",
+  "lib/subscriptions/access.ts",
+  "lib/subscriptions/schemas.ts",
+  "lib/posts/schemas.ts",
+  "lib/posts/constants.ts",
+  "lib/media/validation.ts",
+  "lib/media/crypto.ts",
+  "lib/media/paths.ts",
+  "lib/media/config.ts",
+  "lib/media/schemas.ts",
+  "lib/admin/format.ts",
+  "lib/admin/schemas.ts",
+  "lib/notifications/constants.ts",
+  "lib/notifications/schemas.ts",
+  "lib/api/response.ts",
+  "app/api/health/route.ts",
+  "app/api/ready/route.ts",
+  "app/api/v1/creators/route.ts",
+];
+
+export default defineConfig({
+  test: {
+    environment: "node",
+    setupFiles: ["./tests/setup.ts"],
+    include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"],
+    globals: false,
+    pool: "forks",
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary", "html"],
+      include: coverageInclude,
+      exclude: ["**/*.test.ts", "tests/**"],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
+      },
+    },
+  },
+  resolve: {
+    alias: {
+      "@": root,
+    },
+  },
+});

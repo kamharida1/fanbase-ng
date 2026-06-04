@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/internal/cron/subscription-reconcile",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/internal/cron/wallet-clearance",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/internal/cron/publish-scheduled-posts",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/internal/cron/expire-media-uploads",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}
