@@ -71,6 +71,7 @@ export const CREATOR_NAV: NavLink[] = [
   { href: "/creator/content", label: "Content" },
   { href: "/creator/vault", label: "Vault" },
   { href: "/creator/tiers", label: "Tiers" },
+  { href: "/creator/analytics", label: "Analytics" },
   { href: "/creator/earnings", label: "Earnings" },
   { href: "/creator/withdrawals", label: "Withdrawals" },
   { href: "/creator/messages", label: "Messages" },
