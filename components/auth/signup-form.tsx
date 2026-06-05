@@ -20,6 +20,7 @@ export function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [consentChecked, setConsentChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -42,6 +43,11 @@ export function SignupForm() {
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
+      return;
+    }
+
+    if (!consentChecked) {
+      setError("You must agree to the Terms of Service and Privacy Policy to create an account.");
       return;
     }
 
@@ -144,12 +150,43 @@ export function SignupForm() {
           onChange={(e) => setConfirmPassword(e.target.value)}
         />
       </div>
+      {/* NDPR consent — required before account creation */}
+      <label className="flex items-start gap-3 rounded-lg border p-3 text-sm">
+        <input
+          type="checkbox"
+          required
+          checked={consentChecked}
+          onChange={(e) => setConsentChecked(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border"
+          aria-describedby="consent-text"
+        />
+        <span id="consent-text" className="leading-relaxed text-muted-foreground">
+          I am at least 18 years old and I agree to the{" "}
+          <Link
+            href="/legal/terms"
+            target="_blank"
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link
+            href="/legal/privacy"
+            target="_blank"
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            Privacy Policy
+          </Link>
+          . I consent to Fanbase NG collecting and processing my personal data
+          in accordance with the Nigeria Data Protection Regulation (NDPR) 2019.
+        </span>
+      </label>
       {error ? (
         <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
       ) : null}
-      <Button type="submit" className="w-full" disabled={loading}>
+      <Button type="submit" className="w-full" disabled={loading || !consentChecked}>
         {loading ? "Creating account…" : "Create account"}
       </Button>
       <p className="text-center text-sm">
