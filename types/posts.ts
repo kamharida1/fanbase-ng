@@ -58,5 +58,6 @@ export type PostCommentRow = {
   body: string;
   parent_id: string | null;
   created_at: string;
+  is_pinned?: boolean;
   author?: PostAuthor;
 };

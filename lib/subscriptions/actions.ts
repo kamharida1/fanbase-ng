@@ -39,6 +39,7 @@ export async function subscribeToPlan(
       fanId: auth.userId,
       fanEmail: auth.email,
       planId: parsed.data.planId,
+      offerId: parsed.data.offerId,
     });
 
     if (result.type === "checkout") {

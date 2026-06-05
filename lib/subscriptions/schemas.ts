@@ -8,6 +8,7 @@ export const planBillingIntervalSchema = z.enum([
 
 export const subscribeSchema = z.object({
   planId: z.string().uuid("Invalid plan"),
+  offerId: z.string().uuid().optional(),
 });
 
 export const cancelSubscriptionSchema = z.object({

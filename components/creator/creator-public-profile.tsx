@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
 import { CategoryGrid } from "@/components/vault/category-grid";
+import { OfferBadge } from "@/components/subscriptions/offer-badge";
+import type { OfferRow } from "@/lib/offers/queries";
 import { LivePlayer } from "@/components/live/live-player";
 import { TipButton } from "@/components/tips/tip-button";
 import { PostCard } from "@/components/posts/post-card";
@@ -30,6 +32,7 @@ export function CreatorPublicProfile({
   tipSuccess = false,
   categories = [],
   activeCollectionId = null,
+  planOffers = new Map(),
 }: {
   creator: CreatorProfilePublic;
   subscriptionState: CreatorPageSubscriptionState;
@@ -39,6 +42,7 @@ export function CreatorPublicProfile({
   tipSuccess?: boolean;
   categories?: import("@/lib/vault/queries").CategoryRow[];
   activeCollectionId?: string | null;
+  planOffers?: Map<string, OfferRow>;
 }) {
   const label = creator.display_name ?? creator.username;
   const initial = label.charAt(0).toUpperCase();
@@ -199,6 +203,14 @@ export function CreatorPublicProfile({
                       {plan.trial_days}-day free trial
                     </p>
                   ) : null}
+                  {planOffers.has(plan.id) ? (
+                    <div className="mt-3">
+                      <OfferBadge
+                        offer={planOffers.get(plan.id)!}
+                        originalKobo={plan.price_kobo}
+                      />
+                    </div>
+                  ) : null}
                   <SubscribeButton
                     planId={plan.id}
                     planName={plan.name}
@@ -206,6 +218,7 @@ export function CreatorPublicProfile({
                     subscriptionState={subscriptionState}
                     isLoggedIn={isLoggedIn}
                     loginNext={loginNext}
+                    offerId={planOffers.get(plan.id)?.id}
                   />
                 </li>
               ))}

@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 import type { PostCommentRow } from "@/types/posts";
 import type { PostRow } from "@/types/posts";
 
-export function FeedPostItem({ post }: { post: PostRow }) {
+export function FeedPostItem({
+  post,
+  viewerId,
+}: {
+  post: PostRow;
+  viewerId?: string | null;
+}) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState<PostCommentRow[] | null>(null);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -59,7 +65,12 @@ export function FeedPostItem({ post }: { post: PostRow }) {
                 <p className="text-sm text-destructive">{commentsError}</p>
               ) : null}
               {comments ? (
-                <CommentSection postId={post.id} comments={comments} />
+                <CommentSection
+                  postId={post.id}
+                  comments={comments}
+                  viewerId={viewerId}
+                  postCreatorId={post.creator_id}
+                />
               ) : null}
             </div>
           ) : null

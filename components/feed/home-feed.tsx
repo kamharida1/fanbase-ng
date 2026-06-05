@@ -16,10 +16,12 @@ export function HomeFeed({
   initialPosts,
   initialCursor,
   initialHasMore,
+  viewerId,
 }: {
   initialPosts: PostRow[];
   initialCursor: string | null;
   initialHasMore: boolean;
+  viewerId?: string | null;
 }) {
   const [posts, setPosts] = useState<PostRow[]>(initialPosts);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
@@ -97,7 +99,7 @@ export function HomeFeed({
   return (
     <div className="space-y-6">
       {posts.map((post) => (
-        <FeedPostItem key={post.id} post={post} />
+        <FeedPostItem key={post.id} post={post} viewerId={viewerId} />
       ))}
 
       <div ref={sentinelRef} className="h-4" aria-hidden />

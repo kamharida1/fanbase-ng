@@ -298,9 +298,11 @@ export async function listPostComments(
 ): Promise<PostCommentRow[]> {
   const { data, error } = await supabase
     .from("post_comments")
-    .select("id, post_id, author_id, body, parent_id, created_at")
+    .select("id, post_id, author_id, body, parent_id, created_at, is_pinned")
     .eq("post_id", postId)
     .eq("is_deleted", false)
+    .eq("is_hidden_by_creator", false)
+    .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: true });
 
   if (error || !data) return [];

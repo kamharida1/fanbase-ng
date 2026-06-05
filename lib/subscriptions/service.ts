@@ -61,6 +61,7 @@ export async function startSubscription(
     fanId: string;
     fanEmail: string;
     planId: string;
+    offerId?: string;
   },
 ): Promise<SubscribeResult> {
   const plan = await fetchPlanForSubscribe(supabase, input.planId);
@@ -106,6 +107,21 @@ export async function startSubscription(
     return { type: "active", subscriptionId };
   }
 
+  // Apply offer discount (first month only; renewals bill at full plan price)
+  let checkoutAmountKobo = plan.price_kobo;
+  let appliedOfferId: string | null = null;
+
+  if (input.offerId && (plan.billing_interval === "monthly" || plan.billing_interval === "annual")) {
+    const { getOfferById } = await import("@/lib/offers/queries");
+    const offer = await getOfferById(supabase, input.offerId);
+    if (offer && offer.plan_id === plan.id) {
+      checkoutAmountKobo = Math.round(
+        plan.price_kobo * (1 - offer.discount_pct / 100),
+      );
+      appliedOfferId = offer.id;
+    }
+  }
+
   const reference = buildPaymentReference();
   const callbackUrl = `${APP_URL}/subscriptions?checkout=success&reference=${encodeURIComponent(reference)}`;
 
@@ -114,7 +130,7 @@ export async function startSubscription(
     .insert({
       payer_id: input.fanId,
       paystack_reference: reference,
-      amount_kobo: plan.price_kobo,
+      amount_kobo: checkoutAmountKobo,
       currency: plan.currency,
       type: "subscription",
       status: "pending",
@@ -126,6 +142,7 @@ export async function startSubscription(
         purpose: "subscription_checkout",
         fan_id: input.fanId,
         creator_id: plan.creator_id,
+        ...(appliedOfferId ? { offer_id: appliedOfferId } : {}),
       },
     })
     .select("id")
@@ -156,7 +173,7 @@ export async function startSubscription(
 
   const checkout = await initializeSubscriptionCheckout({
     email: input.fanEmail,
-    amountKobo: plan.price_kobo,
+    amountKobo: checkoutAmountKobo,
     reference,
     callbackUrl,
     metadata: {
@@ -165,8 +182,28 @@ export async function startSubscription(
       creator_id: plan.creator_id,
       billing_interval: plan.billing_interval,
       purpose: "subscription_checkout",
+      ...(appliedOfferId ? { offer_id: appliedOfferId } : {}),
     },
   });
+
+  // Record offer redemption
+  if (appliedOfferId) {
+    try {
+      const { createAdminClient } = await import("@/lib/supabase/admin");
+      const admin = createAdminClient();
+      const { error: rpcErr } = await admin.rpc("increment_offer_redemption", {
+        offer_id: appliedOfferId,
+      });
+      if (rpcErr) {
+        await admin
+          .from("subscription_offers")
+          .update({ redemption_count: 999 })
+          .eq("id", appliedOfferId!);
+      }
+    } catch {
+      // non-critical
+    }
+  }
 
   return {
     type: "checkout",

@@ -60,6 +60,7 @@ export default async function FeedPage({ searchParams }: PageProps) {
         initialPosts={page.posts}
         initialCursor={page.nextCursor}
         initialHasMore={page.hasMore}
+        viewerId={auth.userId}
       />
     </div>
   );

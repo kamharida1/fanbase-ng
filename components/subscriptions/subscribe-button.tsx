@@ -14,6 +14,7 @@ export function SubscribeButton({
   subscriptionState,
   isLoggedIn,
   loginNext,
+  offerId,
 }: {
   planId: string;
   planName: string;
@@ -21,6 +22,7 @@ export function SubscribeButton({
   subscriptionState: CreatorPageSubscriptionState;
   isLoggedIn: boolean;
   loginNext: string;
+  offerId?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -59,7 +61,7 @@ export function SubscribeButton({
     setError(null);
     setLoading(true);
 
-    const result = await subscribeToPlan({ planId });
+    const result = await subscribeToPlan({ planId, offerId });
     setLoading(false);
 
     if (!result.success) {

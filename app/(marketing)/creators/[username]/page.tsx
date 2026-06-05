@@ -8,6 +8,7 @@ import { getPublicLiveStream } from "@/lib/live/queries";
 import { listCreatorPublishedPosts } from "@/lib/posts/queries";
 import { getCreatorPageSubscriptionState } from "@/lib/subscriptions/queries";
 import { listCreatorCategories, getCategoryPosts } from "@/lib/vault/queries";
+import { getActivePlanOffers } from "@/lib/offers/queries";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createClient } from "@/lib/supabase/server";
 
@@ -58,7 +59,7 @@ export default async function CreatorPublicPage({ params, searchParams }: PagePr
   const supabase = await createClient();
   const auth = await getAuthContext(supabase);
 
-  const [subscriptionState, posts, liveStream, categories] = await Promise.all([
+  const [subscriptionState, posts, liveStream, categories, planOffers] = await Promise.all([
     getCreatorPageSubscriptionState(
       supabase,
       auth?.userId ?? null,
@@ -74,6 +75,7 @@ export default async function CreatorPublicPage({ params, searchParams }: PagePr
         ),
     getPublicLiveStream(supabase, creator.user_id),
     listCreatorCategories(supabase, creator.user_id),
+    getActivePlanOffers(supabase, creator.plans.map((p) => p.id)),
   ]);
 
   return (
@@ -93,6 +95,7 @@ export default async function CreatorPublicPage({ params, searchParams }: PagePr
       tipSuccess={tip === "success"}
       categories={categories}
       activeCollectionId={col ?? null}
+      planOffers={planOffers}
     />
   );
 }
