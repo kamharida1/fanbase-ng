@@ -56,6 +56,9 @@ export default function MarketingLayout({
             <Link href="/legal/terms" className="hover:text-foreground">
               Terms
             </Link>
+            <Link href="/legal/privacy" className="hover:text-foreground">
+              Privacy
+            </Link>
           </nav>
         </div>
       </footer>
