@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { RoleBadge } from "@/components/auth/role-badge";
@@ -11,6 +12,8 @@ import {
   BecomeCreatorCard,
   CreatorStudioLinks,
 } from "@/components/creator/become-creator-card";
+import { AppearanceSection } from "@/components/settings/appearance-section";
+import { UpdateProfileForm } from "@/components/settings/update-profile-form";
 import { requireAuth } from "@/lib/auth/get-auth-context";
 import { ROLE_LABELS } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
@@ -28,11 +31,11 @@ export default async function FanSettingsPage() {
     .limit(20);
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="mt-2 text-muted-foreground">
-          Account, security, and active sessions.
+          Manage your profile, appearance, and account security.
         </p>
       </div>
 
@@ -40,46 +43,80 @@ export default async function FanSettingsPage() {
         <AuthAlert />
       </Suspense>
 
+      {/* Profile */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Account</h2>
-        <dl className="grid max-w-md gap-3 text-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">Email</dt>
-            <dd>{auth.email ?? "—"}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">Username</dt>
-            <dd>@{auth.profile.username}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">Display name</dt>
-            <dd>{auth.profile.display_name ?? "—"}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">Role</dt>
-            <dd className="flex items-center gap-2">
-              <RoleBadge role={auth.appRole} />
-              <span className="text-muted-foreground">
-                {ROLE_LABELS[auth.appRole]}
-              </span>
-            </dd>
-          </div>
-        </dl>
+        <div>
+          <h2 className="text-lg font-semibold">Profile</h2>
+          <p className="text-sm text-muted-foreground">
+            Your public display name. Username and email cannot be changed here.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <RoleBadge role={auth.appRole} />
+          <span className="text-sm text-muted-foreground">
+            {ROLE_LABELS[auth.appRole]}
+          </span>
+        </div>
+        <UpdateProfileForm
+          email={auth.email}
+          username={auth.profile.username}
+          displayName={auth.profile.display_name}
+        />
       </section>
 
+      {/* Appearance */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Appearance</h2>
+          <p className="text-sm text-muted-foreground">
+            Customize how the app looks on your device.
+          </p>
+        </div>
+        <AppearanceSection />
+      </section>
+
+      {/* Notifications */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Notifications</h2>
+          <p className="text-sm text-muted-foreground">
+            Control which notifications you receive and how.
+          </p>
+        </div>
+        <Link
+          href="/notifications"
+          className="inline-flex items-center gap-1 rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+        >
+          Manage notification preferences →
+        </Link>
+      </section>
+
+      {/* Creator */}
       {auth.profile.role === "creator" ? (
         <CreatorStudioLinks username={auth.profile.username} />
       ) : (
         <BecomeCreatorCard />
       )}
 
+      {/* Security */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Change password</h2>
+        <div>
+          <h2 className="text-lg font-semibold">Change password</h2>
+          <p className="text-sm text-muted-foreground">
+            Update your password. You&apos;ll need your current password to confirm.
+          </p>
+        </div>
         <ChangePasswordForm />
       </section>
 
+      {/* Sessions */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Active sessions</h2>
+        <div>
+          <h2 className="text-lg font-semibold">Active sessions</h2>
+          <p className="text-sm text-muted-foreground">
+            Devices currently signed in to your account.
+          </p>
+        </div>
         <SessionsManager sessions={(sessions ?? []) as SessionRow[]} />
       </section>
     </div>

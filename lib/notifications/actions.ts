@@ -87,6 +87,8 @@ export async function updateNotificationPreferencesAction(
       preferences: merged,
       email_enabled: parsed.data.emailEnabled ?? true,
       push_enabled: parsed.data.pushEnabled ?? true,
+      sms_enabled: parsed.data.smsEnabled ?? false,
+      marketing_enabled: parsed.data.marketingEnabled ?? false,
     });
 
   if (error) return { success: false, error: error.message };

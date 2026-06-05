@@ -18,6 +18,8 @@ export const markReadSchema = z.object({
 export const updatePreferencesSchema = z.object({
   emailEnabled: z.boolean().optional(),
   pushEnabled: z.boolean().optional(),
+  smsEnabled: z.boolean().optional(),
+  marketingEnabled: z.boolean().optional(),
   new_subscriber: z.boolean().optional(),
   new_message: z.boolean().optional(),
   new_comment: z.boolean().optional(),

@@ -78,4 +78,5 @@ export const CREATOR_NAV: NavLink[] = [
   { href: "/creator/messages", label: "Messages" },
   { href: "/notifications", label: "Notifications" },
   { href: "/referrals", label: "Refer & earn" },
+  { href: "/settings", label: "Settings" },
 ];
