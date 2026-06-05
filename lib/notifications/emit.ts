@@ -1,9 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { formatNgnFromKobo } from "@/lib/creators/format";
+import {
+  creatorLiveEmail,
+  newCommentEmail,
+  newMessageEmail,
+  newSubscriberEmail,
+  newTipEmail,
+  payoutEmail,
+} from "@/lib/email/templates";
+import { sendEmailNotification } from "@/lib/email/send";
 import { getProfileLabel } from "@/lib/notifications/profiles";
 import { createNotification } from "@/lib/notifications/service";
 import { buildAppActionUrl } from "@/lib/security/safe-url";
+
+// Helper: fire-and-forget email — never let a send error break in-app notifications
+function fireEmail(promise: Promise<void>, tag: string): void {
+  promise.catch((err) => console.error(`[email:${tag}]`, err));
+}
 
 export async function notifyNewSubscriber(
   admin: SupabaseClient,
@@ -12,6 +26,7 @@ export async function notifyNewSubscriber(
     fanId: string;
     subscriptionId: string;
     planName: string;
+    amountKobo?: number;
   },
 ): Promise<void> {
   const fanLabel = await getProfileLabel(admin, input.fanId);
@@ -27,6 +42,22 @@ export async function notifyNewSubscriber(
     metadata: { fan_id: input.fanId, plan_name: input.planName },
     idempotencyKey: `subscriber:${input.subscriptionId}`,
   });
+
+  const { subject, html } = newSubscriberEmail({
+    creatorName: "",
+    fanName: fanLabel,
+    planName: input.planName,
+    amountKobo: input.amountKobo ?? 0,
+  });
+  fireEmail(
+    sendEmailNotification(admin, {
+      userId: input.creatorId,
+      notificationType: "new_subscriber",
+      subject,
+      html,
+    }),
+    "new_subscriber",
+  );
 }
 
 export async function notifyNewMessage(
@@ -61,6 +92,21 @@ export async function notifyNewMessage(
     },
     idempotencyKey: `message:${input.messageId}`,
   });
+
+  const { subject, html } = newMessageEmail({
+    recipientName: "",
+    senderName: senderLabel,
+    preview,
+  });
+  fireEmail(
+    sendEmailNotification(admin, {
+      userId: input.recipientId,
+      notificationType: "new_message",
+      subject,
+      html,
+    }),
+    "new_message",
+  );
 }
 
 export async function notifyNewComment(
@@ -88,6 +134,21 @@ export async function notifyNewComment(
     metadata: { post_id: input.postId, author_id: input.authorId },
     idempotencyKey: `comment:${input.commentId}`,
   });
+
+  const { subject, html } = newCommentEmail({
+    creatorName: "",
+    authorName: authorLabel,
+    commentBody: input.body,
+  });
+  fireEmail(
+    sendEmailNotification(admin, {
+      userId: input.creatorId,
+      notificationType: "new_comment",
+      subject,
+      html,
+    }),
+    "new_comment",
+  );
 }
 
 export async function notifyNewLike(
@@ -113,6 +174,7 @@ export async function notifyNewLike(
     metadata: { fan_id: input.fanId },
     idempotencyKey: `like:${input.postId}:${input.fanId}`,
   });
+  // Likes are high-volume — email not sent to avoid inbox flooding
 }
 
 export async function notifyNewTip(
@@ -138,6 +200,21 @@ export async function notifyNewTip(
     metadata: { fan_id: input.fanId, amount_kobo: input.amountKobo },
     idempotencyKey: `tip:${input.paymentId}`,
   });
+
+  const { subject, html } = newTipEmail({
+    creatorName: "",
+    fanName: fanLabel,
+    amountKobo: input.amountKobo,
+  });
+  fireEmail(
+    sendEmailNotification(admin, {
+      userId: input.creatorId,
+      notificationType: "new_tip",
+      subject,
+      html,
+    }),
+    "new_tip",
+  );
 }
 
 export async function notifyCreatorLive(
@@ -148,9 +225,18 @@ export async function notifyCreatorLive(
     title: string;
   },
 ): Promise<void> {
-  const creatorLabel = await getProfileLabel(admin, input.creatorId);
+  // Fetch creator profile for display name + username
+  const { data: creatorProfile } = await admin
+    .from("profiles")
+    .select("username, display_name")
+    .eq("id", input.creatorId)
+    .maybeSingle();
 
-  // Fetch up to 100 active subscribers to notify
+  const creatorLabel =
+    creatorProfile?.display_name ?? creatorProfile?.username ?? "Creator";
+  const creatorUsername = creatorProfile?.username ?? input.creatorId;
+
+  // Fetch up to 100 active subscribers
   const { data: subs } = await admin
     .from("subscriptions")
     .select("fan_id")
@@ -160,20 +246,37 @@ export async function notifyCreatorLive(
 
   if (!subs?.length) return;
 
+  const { subject, html } = creatorLiveEmail({
+    fanName: "",
+    creatorName: creatorLabel,
+    creatorUsername,
+    streamTitle: input.title,
+  });
+
   await Promise.allSettled(
-    subs.map((sub) =>
-      createNotification(admin, {
+    subs.map(async (sub) => {
+      await createNotification(admin, {
         userId: sub.fan_id,
         type: "creator_live",
         title: `${creatorLabel} is live now`,
         body: input.title,
-        actionUrl: buildAppActionUrl(`/creators/${input.creatorId}/live`),
+        actionUrl: buildAppActionUrl(`/creators/${creatorUsername}`),
         entityType: "live_streams",
         entityId: input.streamId,
         metadata: { creator_id: input.creatorId },
         idempotencyKey: `live:${input.streamId}:${sub.fan_id}`,
-      }),
-    ),
+      });
+
+      fireEmail(
+        sendEmailNotification(admin, {
+          userId: sub.fan_id,
+          notificationType: "creator_live",
+          subject,
+          html,
+        }),
+        "creator_live",
+      );
+    }),
   );
 }
 
@@ -198,4 +301,19 @@ export async function notifyNewPayout(
     metadata: { amount_kobo: input.amountKobo },
     idempotencyKey: `payout:${input.payoutRequestId}`,
   });
+
+  const { subject, html } = payoutEmail({
+    creatorName: "",
+    amountKobo: input.amountKobo,
+    status: "requested",
+  });
+  fireEmail(
+    sendEmailNotification(admin, {
+      userId: input.creatorId,
+      notificationType: "new_payout",
+      subject,
+      html,
+    }),
+    "new_payout",
+  );
 }
