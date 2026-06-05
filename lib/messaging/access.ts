@@ -16,7 +16,17 @@ export async function canFanMessageCreator(
     .eq("user_id", creatorId)
     .maybeSingle();
 
-  return Boolean(creator);
+  if (!creator) return false;
+
+  // Blocked fans cannot message the creator (fan can read their own block status)
+  const { data: block } = await supabase
+    .from("creator_blocks")
+    .select("creator_id")
+    .eq("creator_id", creatorId)
+    .eq("fan_id", fanId)
+    .maybeSingle();
+
+  return !block;
 }
 
 export async function countFanMessagesInConversation(

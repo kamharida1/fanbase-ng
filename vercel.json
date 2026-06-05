@@ -15,6 +15,10 @@
     {
       "path": "/api/internal/cron/expire-media-uploads",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/internal/cron/expire-stories",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

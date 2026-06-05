@@ -82,6 +82,13 @@ export async function startSubscription(
     throw new Error("This creator is not accepting new subscribers.");
   }
 
+  // Check if this fan is blocked by the creator
+  const { isFanBlocked } = await import("@/lib/fans/queries");
+  const blocked = await isFanBlocked(supabase, plan.creator_id, input.fanId);
+  if (blocked) {
+    throw new Error("You cannot subscribe to this creator.");
+  }
+
   const blocking = await getBlockingSubscription(
     supabase,
     input.fanId,
