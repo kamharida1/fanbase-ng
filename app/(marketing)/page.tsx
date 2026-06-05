@@ -4,7 +4,6 @@ import {
   BadgeCheck,
   Lock,
   MessageCircle,
-  Shield,
   TrendingUp,
   Users,
   Wallet,
@@ -52,12 +51,6 @@ const FEATURES = [
     title: "Verified creators",
     description:
       "Verified badges on genuine accounts so fans always know they're supporting the real creator.",
-  },
-  {
-    Icon: Shield,
-    title: "Moderated platform",
-    description:
-      "Content goes through review before it goes live. A safe, respectful environment for everyone.",
   },
 ] as const;
 
