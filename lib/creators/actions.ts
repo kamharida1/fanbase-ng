@@ -121,6 +121,7 @@ export async function updateCreatorProfile(
       bio: parsed.data.bio || null,
       is_accepting_subscribers: parsed.data.is_accepting_subscribers ?? true,
       social_links: social,
+      category: parsed.data.category ?? [],
     })
     .eq("user_id", auth.userId);
 

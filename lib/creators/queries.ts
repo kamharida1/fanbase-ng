@@ -35,7 +35,7 @@ function getProfileSnippet(
 
 export async function listCreators(
   supabase: SupabaseClient,
-  options?: { limit?: number; search?: string },
+  options?: { limit?: number; search?: string; category?: string },
 ): Promise<CreatorListItem[]> {
   const limit = options?.limit ?? 24;
 
@@ -46,6 +46,7 @@ export async function listCreators(
       user_id,
       bio,
       is_verified,
+      category,
       profiles!inner (
         username,
         display_name,
@@ -61,6 +62,11 @@ export async function listCreators(
     .is("profiles.deleted_at", null)
     .eq("is_accepting_subscribers", true)
     .limit(limit);
+
+  // Category filter — uses GIN index on creator_profiles.category
+  if (options?.category) {
+    query = query.contains("category", [options.category]);
+  }
 
   const searchTerm = options?.search?.trim()
     ? sanitizePostgrestIlikeTerm(options.search.trim())
@@ -118,6 +124,7 @@ export async function listCreators(
       plan_count: stats?.count ?? 0,
       min_price_kobo: stats?.min ?? null,
       is_live: liveSet.has(row.user_id),
+      categories: (row as { category?: string[] }).category ?? [],
     };
   });
 }

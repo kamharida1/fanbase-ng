@@ -40,7 +40,7 @@ export type CreatorProfileRow = {
   is_verified: boolean;
   is_accepting_subscribers: boolean;
   social_links: SocialLinks;
-  category: string[];
+  category: string[] | null;
 };
 
 export type CreatorListItem = {
@@ -53,4 +53,5 @@ export type CreatorListItem = {
   plan_count: number;
   min_price_kobo: number | null;
   is_live?: boolean;
+  categories?: string[];
 };

@@ -42,6 +42,10 @@ export const updateCreatorProfileSchema = z.object({
     .or(z.literal("")),
   is_accepting_subscribers: z.boolean().optional(),
   social_links: socialLinksSchema,
+  category: z
+    .array(z.string().trim().min(1).max(50))
+    .max(3, "Maximum 3 categories")
+    .optional(),
 });
 
 export const subscriptionPlanSchema = z

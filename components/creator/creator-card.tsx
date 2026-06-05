@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LiveBadge } from "@/components/live/live-badge";
 import { VerifiedBadge } from "@/components/creator/verified-badge";
+import { CATEGORY_MAP } from "@/lib/creators/categories";
 import { formatNgnFromKobo } from "@/lib/creators/format";
 import type { CreatorListItem } from "@/types/creator";
 
@@ -52,6 +53,22 @@ export function CreatorCard({ creator }: { creator: CreatorListItem }) {
           <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
             {creator.bio}
           </p>
+        ) : null}
+        {creator.categories && creator.categories.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {creator.categories.slice(0, 2).map((cat) => {
+              const meta = CATEGORY_MAP.get(cat as Parameters<typeof CATEGORY_MAP.get>[0]);
+              return meta ? (
+                <span
+                  key={cat}
+                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                >
+                  <span aria-hidden>{meta.emoji}</span>
+                  {meta.label}
+                </span>
+              ) : null;
+            })}
+          </div>
         ) : null}
         {creator.min_price_kobo != null ? (
           <p className="mt-3 text-sm font-medium">

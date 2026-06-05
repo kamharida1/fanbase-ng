@@ -10,6 +10,10 @@ import {
   updateProfileBasics,
   updateProfileImageUrl,
 } from "@/lib/creators/actions";
+import {
+  CREATOR_CATEGORIES,
+  MAX_CATEGORIES,
+} from "@/lib/creators/categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +43,9 @@ export function ProfileEditor({
   const [bannerUrl, setBannerUrl] = useState(creator?.banner_url ?? "");
   const [accepting, setAccepting] = useState(
     creator?.is_accepting_subscribers ?? true,
+  );
+  const [categories, setCategories] = useState<string[]>(
+    creator?.category ?? [],
   );
   const [social, setSocial] = useState<SocialLinks>({
     website: creator?.social_links?.website ?? "",
@@ -73,6 +80,7 @@ export function ProfileEditor({
       bio,
       is_accepting_subscribers: accepting,
       social_links: social,
+      category: categories,
     });
     setLoading(false);
     if (!result.success) {
@@ -246,8 +254,52 @@ export function ProfileEditor({
               />
               Accepting new subscribers
             </label>
+
+            {/* Category picker */}
+            <div className="space-y-2">
+              <Label>
+                Content categories{" "}
+                <span className="font-normal text-muted-foreground">
+                  (pick up to {MAX_CATEGORIES})
+                </span>
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {CREATOR_CATEGORIES.map((c) => {
+                  const active = categories.includes(c.value);
+                  return (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() =>
+                        setCategories((prev) =>
+                          active
+                            ? prev.filter((v) => v !== c.value)
+                            : prev.length < MAX_CATEGORIES
+                              ? [...prev, c.value]
+                              : prev,
+                        )
+                      }
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+                        active
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "hover:border-primary hover:text-primary"
+                      }`}
+                    >
+                      <span aria-hidden>{c.emoji}</span>
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {categories.length === MAX_CATEGORIES && (
+                <p className="text-xs text-muted-foreground">
+                  Maximum {MAX_CATEGORIES} categories selected.
+                </p>
+              )}
+            </div>
+
             <Button type="button" onClick={saveCreator} disabled={loading}>
-              Save bio & links
+              Save bio & settings
             </Button>
           </section>
 
