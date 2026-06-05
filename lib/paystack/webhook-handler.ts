@@ -12,6 +12,7 @@ import { fulfillPpvPurchase } from "@/lib/payments/ppv-processor";
 import {
   failSubscriptionPayment,
   fulfillSubscriptionPayment,
+  fulfillTipPayment,
   recordSubscriptionRenewal,
 } from "@/lib/payments/processor";
 import { processRefundWebhook } from "@/lib/payments/refunds";
@@ -76,6 +77,12 @@ async function handleChargeSuccess(
     requestId,
   });
   if (ppvHandled) return;
+
+  const tipHandled = await fulfillTipPayment(admin, {
+    chargeData: data,
+    requestId,
+  });
+  if (tipHandled) return;
 
   if (!checkoutMeta) return;
 

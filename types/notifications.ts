@@ -4,7 +4,8 @@ export type NotificationType =
   | "new_comment"
   | "new_like"
   | "new_payout"
-  | "creator_live";
+  | "creator_live"
+  | "new_tip";
 
 export type NotificationStatus = "pending" | "sent" | "failed" | "read";
 

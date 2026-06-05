@@ -33,7 +33,8 @@ export type AuditAction =
   | "admin.report.resolved"
   | "admin.payout.reviewed"
   | "live.stream.started"
-  | "live.stream.ended";
+  | "live.stream.ended"
+  | "payment.tip_received";
 
 export type WriteAuditLogInput = {
   actorId?: string | null;

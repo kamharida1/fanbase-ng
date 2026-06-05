@@ -12,7 +12,7 @@ import {
 
 describe("notifications", () => {
   it("exports constants", () => {
-    expect(NOTIFICATION_TYPES.length).toBe(6);
+    expect(NOTIFICATION_TYPES.length).toBe(7);
     expect(NOTIFICATIONS_PAGE_SIZE).toBe(25);
     expect(DEFAULT_NOTIFICATION_PREFERENCES.new_message).toBe(true);
   });

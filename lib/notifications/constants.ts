@@ -7,6 +7,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   new_like: "Likes on your posts",
   new_payout: "Payout updates",
   creator_live: "Creator going live",
+  new_tip: "Tips received",
 };
 
 export const NOTIFICATION_TYPES: NotificationType[] = [
@@ -16,6 +17,7 @@ export const NOTIFICATION_TYPES: NotificationType[] = [
   "new_like",
   "new_payout",
   "creator_live",
+  "new_tip",
 ];
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: Record<
@@ -28,6 +30,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: Record<
   new_like: true,
   new_payout: true,
   creator_live: true,
+  new_tip: true,
 };
 
 export const NOTIFICATIONS_PAGE_SIZE = 25;

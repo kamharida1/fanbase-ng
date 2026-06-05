@@ -7,6 +7,7 @@ const notificationTypeSchema = z.enum([
   "new_like",
   "new_payout",
   "creator_live",
+  "new_tip",
 ]);
 
 export const markReadSchema = z.object({
@@ -23,6 +24,7 @@ export const updatePreferencesSchema = z.object({
   new_like: z.boolean().optional(),
   new_payout: z.boolean().optional(),
   creator_live: z.boolean().optional(),
+  new_tip: z.boolean().optional(),
 });
 
 export const listNotificationsSchema = z.object({

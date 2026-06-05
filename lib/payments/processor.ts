@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { writeAuditLog } from "@/lib/audit/log";
-import { parseSubscriptionCheckoutMetadata } from "@/lib/paystack/parse";
+import { parseTipMetadata, parseSubscriptionCheckoutMetadata } from "@/lib/paystack/parse";
 import { chargeAmountMatchesPayment } from "@/lib/security/payment-amount";
 import { creditCreatorFromPayment } from "@/lib/wallets/ledger";
 import { completePaidSubscription } from "@/lib/subscriptions/service";
@@ -224,6 +224,84 @@ export async function failSubscriptionPayment(
     afterState: { reference: input.reference, reason: input.reason },
     metadata: input.chargeData ? { gateway: input.chargeData } : {},
   });
+}
+
+export async function fulfillTipPayment(
+  admin: SupabaseClient,
+  input: {
+    chargeData: Record<string, unknown>;
+    requestId?: string | null;
+  },
+): Promise<boolean> {
+  const meta = parseTipMetadata(input.chargeData);
+  if (!meta) return false;
+
+  const reference =
+    typeof input.chargeData.reference === "string"
+      ? input.chargeData.reference
+      : undefined;
+  if (!reference) return false;
+
+  const payment = await getPaymentByReference(admin, reference);
+  if (!payment) return false;
+
+  // Idempotent: already processed
+  if (payment.status === "success") return true;
+
+  const amount =
+    typeof input.chargeData.amount === "number"
+      ? input.chargeData.amount
+      : payment.amount_kobo;
+
+  if (!chargeAmountMatchesPayment(amount, payment.amount_kobo)) return false;
+
+  await admin
+    .from("payments")
+    .update({
+      status: "success",
+      webhook_processed_at: new Date().toISOString(),
+      verified_at: new Date().toISOString(),
+    })
+    .eq("id", payment.id)
+    .eq("status", "pending");
+
+  if (meta.creator_id) {
+    try {
+      await creditCreatorFromPayment(admin, {
+        creatorId: meta.creator_id,
+        paymentId: payment.id,
+        grossKobo: amount,
+        idempotencyKey: `tip:${payment.id}:credit`,
+        description: "Fan tip",
+      });
+    } catch (err) {
+      console.error("[wallet] tip credit", err);
+    }
+
+    try {
+      const { notifyNewTip } = await import("@/lib/notifications/emit");
+      await notifyNewTip(admin, {
+        creatorId: meta.creator_id,
+        fanId: meta.fan_id,
+        amountKobo: amount,
+        paymentId: payment.id,
+      });
+    } catch (err) {
+      console.error("[notifications] tip", err);
+    }
+  }
+
+  await writeAuditLog(admin, {
+    actorId: meta.fan_id,
+    actorType: "user",
+    action: "payment.tip_received",
+    entityType: "payments",
+    entityId: payment.id,
+    requestId: input.requestId,
+    afterState: { amount_kobo: amount, creator_id: meta.creator_id },
+  });
+
+  return true;
 }
 
 export async function recordSubscriptionRenewal(

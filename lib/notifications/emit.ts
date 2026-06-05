@@ -115,6 +115,31 @@ export async function notifyNewLike(
   });
 }
 
+export async function notifyNewTip(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    fanId: string;
+    amountKobo: number;
+    paymentId: string;
+  },
+): Promise<void> {
+  const fanLabel = await getProfileLabel(admin, input.fanId);
+  const amount = formatNgnFromKobo(input.amountKobo);
+
+  await createNotification(admin, {
+    userId: input.creatorId,
+    type: "new_tip",
+    title: "New tip received",
+    body: `${fanLabel} sent you a ${amount} tip.`,
+    actionUrl: buildAppActionUrl("/creator/earnings"),
+    entityType: "payments",
+    entityId: input.paymentId,
+    metadata: { fan_id: input.fanId, amount_kobo: input.amountKobo },
+    idempotencyKey: `tip:${input.paymentId}`,
+  });
+}
+
 export async function notifyCreatorLive(
   admin: SupabaseClient,
   input: {

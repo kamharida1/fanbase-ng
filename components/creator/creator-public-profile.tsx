@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
 import { LivePlayer } from "@/components/live/live-player";
+import { TipButton } from "@/components/tips/tip-button";
 import { PostCard } from "@/components/posts/post-card";
 import { VerifiedBadge } from "@/components/creator/verified-badge";
 import { MessageCreatorButton } from "@/components/messaging/message-creator-button";
@@ -25,12 +26,14 @@ export function CreatorPublicProfile({
   isLoggedIn,
   posts = [],
   liveStream = null,
+  tipSuccess = false,
 }: {
   creator: CreatorProfilePublic;
   subscriptionState: CreatorPageSubscriptionState;
   isLoggedIn: boolean;
   posts?: PostRow[];
   liveStream?: { embedUrl: string; title: string } | null;
+  tipSuccess?: boolean;
 }) {
   const label = creator.display_name ?? creator.username;
   const initial = label.charAt(0).toUpperCase();
@@ -88,11 +91,25 @@ export function CreatorPublicProfile({
           </div>
         </div>
 
+        {tipSuccess ? (
+          <div className="mt-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 dark:border-green-900 dark:bg-green-950 dark:text-green-100">
+            Your tip was sent successfully. Thank you for supporting this creator! 💚
+          </div>
+        ) : null}
+
         {creator.bio ? (
           <p className="mt-6 whitespace-pre-wrap text-base leading-relaxed">
             {creator.bio}
           </p>
         ) : null}
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <TipButton
+            creatorId={creator.user_id}
+            creatorUsername={creator.username}
+            isLoggedIn={isLoggedIn}
+          />
+        </div>
 
         {socialEntries.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-3">

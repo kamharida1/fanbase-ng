@@ -61,6 +61,23 @@ export function parseNestedSubscriptionCode(
   return asString(sub?.subscription_code);
 }
 
+export type TipMetadata = {
+  fan_id: string;
+  creator_id: string;
+  purpose: "tip";
+};
+
+export function parseTipMetadata(
+  data: Record<string, unknown>,
+): TipMetadata | null {
+  const meta = parseMetadata(data);
+  if (asString(meta.purpose) !== "tip") return null;
+  const fanId = asString(meta.fan_id);
+  const creatorId = asString(meta.creator_id);
+  if (!fanId || !creatorId) return null;
+  return { fan_id: fanId, creator_id: creatorId, purpose: "tip" };
+}
+
 /**
  * Extracts the two fields needed for deterministic subscription matching from
  * a Paystack `subscription.create` webhook payload.

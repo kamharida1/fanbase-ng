@@ -15,7 +15,10 @@ import { createClient } from "@/lib/supabase/server";
 // CDN caching), so subscription state and post visibility are always correct.
 export const revalidate = 600;
 
-type PageProps = { params: Promise<{ username: string }> };
+type PageProps = {
+  params: Promise<{ username: string }>;
+  searchParams: Promise<{ tip?: string; reference?: string }>;
+};
 
 // Creator profile metadata is identical for every visitor.
 // Cache it independently of the per-request auth context.
@@ -40,8 +43,9 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-export default async function CreatorPublicPage({ params }: PageProps) {
+export default async function CreatorPublicPage({ params, searchParams }: PageProps) {
   const { username } = await params;
+  const { tip } = await searchParams;
 
   // Cached: public creator info (name, bio, plans, social links).
   // Same for every visitor — safe to serve from the data cache.
@@ -82,6 +86,7 @@ export default async function CreatorPublicPage({ params }: PageProps) {
             }
           : null
       }
+      tipSuccess={tip === "success"}
     />
   );
 }
