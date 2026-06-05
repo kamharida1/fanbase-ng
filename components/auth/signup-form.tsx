@@ -15,6 +15,12 @@ import { createClient } from "@/lib/supabase/client";
 export function SignupForm() {
   const router = useRouter();
 
+  // Capture referral code from URL (?ref=CODE) to pass through the email link
+  const refCode =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("ref") ?? ""
+      : "";
+
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -65,7 +71,7 @@ export function SignupForm() {
           display_name: displayName.trim() || undefined,
           username: normalizedUsername || undefined,
         },
-        emailRedirectTo: `${appUrl}/callback?next=/feed`,
+        emailRedirectTo: `${appUrl}/callback?next=/feed${refCode ? `&ref=${encodeURIComponent(refCode)}` : ""}`,
       },
     });
 

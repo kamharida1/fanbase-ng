@@ -59,6 +59,7 @@ export const FAN_NAV: NavLink[] = [
   { href: "/subscriptions", label: "Subscriptions" },
   { href: "/messages", label: "Messages" },
   { href: "/notifications", label: "Notifications" },
+  { href: "/referrals", label: "Refer & earn" },
   { href: "/settings", label: "Settings" },
 ];
 
@@ -76,4 +77,5 @@ export const CREATOR_NAV: NavLink[] = [
   { href: "/creator/withdrawals", label: "Withdrawals" },
   { href: "/creator/messages", label: "Messages" },
   { href: "/notifications", label: "Notifications" },
+  { href: "/referrals", label: "Refer & earn" },
 ];

@@ -1,8 +1,10 @@
 import Link from "next/link";
 
+import { OnboardingChecklist } from "@/components/onboarding/onboarding-checklist";
 import { BalanceCards } from "@/components/wallet/balance-cards";
 import { TransactionList } from "@/components/wallet/transaction-list";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
+import { getCreatorOnboardingStatus } from "@/lib/onboarding/queries";
 import { getCreatorWalletOverview } from "@/lib/wallets/queries";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -12,7 +14,10 @@ export default async function CreatorDashboardPage() {
   const auth = await getAuthContext(supabase);
   if (!auth) redirect("/login?next=/creator/dashboard");
 
-  const overview = await getCreatorWalletOverview(supabase, auth.userId);
+  const [overview, onboarding] = await Promise.all([
+    getCreatorWalletOverview(supabase, auth.userId),
+    getCreatorOnboardingStatus(supabase, auth.userId),
+  ]);
 
   return (
     <div className="space-y-10">
@@ -22,6 +27,8 @@ export default async function CreatorDashboardPage() {
           Earnings overview and recent wallet activity.
         </p>
       </div>
+
+      <OnboardingChecklist status={onboarding} />
 
       <BalanceCards
         wallet={overview.wallet}

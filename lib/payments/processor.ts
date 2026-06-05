@@ -164,6 +164,15 @@ export async function fulfillSubscriptionPayment(
     metadata: { plan_id: meta.plan_id, billing_interval: meta.billing_interval },
   });
 
+  // Qualify referral on first subscription payment (fire-and-forget)
+  import("@/lib/referrals/actions").then(({ qualifyAndRewardReferral }) =>
+    qualifyAndRewardReferral({
+      refereeId: meta.fan_id,
+      paymentId: updated?.id ?? payment?.id ?? "",
+      paymentAmountKobo: amount,
+    }),
+  ).catch((err) => console.error("[referral] qualify failed", err));
+
   const paymentId = updated?.id ?? payment?.id;
   if (paymentId && meta.creator_id) {
     try {

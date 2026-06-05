@@ -6,12 +6,15 @@ import { canAccessPath, sanitizeNextPath } from "@/lib/auth/paths";
 import { welcomeEmail } from "@/lib/email/templates";
 import { sendTransactionalEmail } from "@/lib/email/send";
 import { insertUserSession } from "@/lib/auth/session";
+import { recordReferral } from "@/lib/referrals/actions";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const nextRaw = searchParams.get("next");
+  const refCode = searchParams.get("ref");
   const safeNext = sanitizeNextPath(nextRaw);
 
   if (!code) {
@@ -34,13 +37,23 @@ export async function GET(request: Request) {
     ipAddress: ip,
   });
 
-  // Send welcome email to brand-new users (confirmed within the last 2 minutes)
+  // Detect new user (confirmed within the last 2 minutes)
   const confirmedAt = data.user.confirmed_at
     ? new Date(data.user.confirmed_at).getTime()
     : 0;
   const isNewUser = Date.now() - confirmedAt < 2 * 60 * 1000;
 
-  if (isNewUser && data.user.email) {
+  // Record referral if a ref code was passed through the email link
+  if (refCode && isNewUser) {
+    recordReferral(createAdminClient(), {
+      refereeId: data.user.id,
+      refCode,
+    }).catch((err) => console.error("[referral] record failed", err));
+  }
+
+  // Send welcome email to brand-new users
+
+  if (isNewUser && data.user.email && !refCode) {
     const displayName =
       (data.user.user_metadata?.full_name as string | undefined) ??
       (data.user.user_metadata?.name as string | undefined) ??
