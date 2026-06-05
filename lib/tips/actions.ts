@@ -6,18 +6,9 @@ import {
 } from "@/lib/paystack/checkout";
 import { requireAuth } from "@/lib/auth/get-auth-context";
 import { createClient } from "@/lib/supabase/server";
+import { MIN_TIP_KOBO } from "@/lib/tips/constants";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-
-export const TIP_PRESETS_KOBO = [
-  50_000,   // ₦500
-  100_000,  // ₦1,000
-  200_000,  // ₦2,000
-  500_000,  // ₦5,000
-  1_000_000, // ₦10,000
-] as const;
-
-export const MIN_TIP_KOBO = 10_000; // ₦100
 
 export type TipResult =
   | { success: true; authorizationUrl: string }

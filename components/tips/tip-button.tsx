@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { Heart } from "lucide-react";
 
-import { startTip, TIP_PRESETS_KOBO, MIN_TIP_KOBO } from "@/lib/tips/actions";
+import { startTip } from "@/lib/tips/actions";
+import { TIP_PRESETS_KOBO, MIN_TIP_KOBO } from "@/lib/tips/constants";
 import { formatNgnFromKobo } from "@/lib/creators/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
