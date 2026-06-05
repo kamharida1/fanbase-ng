@@ -7,8 +7,11 @@ import { Heart, Lock } from "lucide-react";
 import { togglePostLike } from "@/lib/posts/actions";
 import { startPpvPurchase } from "@/lib/posts/ppv";
 import { formatNgnFromKobo } from "@/lib/creators/format";
+import { ShareIconButton } from "@/components/shared/share-button";
 import { Button } from "@/components/ui/button";
 import type { PostRow } from "@/types/posts";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
 function formatWhen(iso: string | null): string {
   if (!iso) return "";
@@ -157,6 +160,15 @@ export function PostCard({
         <span className="text-sm text-muted-foreground">
           {post.comment_count ?? 0} comments
         </span>
+        {post.visibility === "public" && post.author?.username ? (
+          <div className="ml-auto">
+            <ShareIconButton
+              url={`${APP_URL}/creators/${post.author.username}`}
+              title={post.caption?.slice(0, 80) ?? "Check out this post on Fanbase NG"}
+              text={`${post.author.display_name ?? post.author.username} on Fanbase NG`}
+            />
+          </div>
+        ) : null}
       </footer>
 
       {!locked && showComments ? (

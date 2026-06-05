@@ -5,6 +5,7 @@ import { CategoryGrid } from "@/components/vault/category-grid";
 import { OfferBadge } from "@/components/subscriptions/offer-badge";
 import type { OfferRow } from "@/lib/offers/queries";
 import { LivePlayer } from "@/components/live/live-player";
+import { ShareButton } from "@/components/shared/share-button";
 import { TipButton } from "@/components/tips/tip-button";
 import { PostCard } from "@/components/posts/post-card";
 import { VerifiedBadge } from "@/components/creator/verified-badge";
@@ -91,7 +92,16 @@ export function CreatorPublicProfile({
               <p className="text-muted-foreground">@{creator.username}</p>
             </div>
           </div>
-          <div className="shrink-0 sm:pb-1">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:pb-1">
+            <ShareButton
+              url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/creators/${creator.username}`}
+              title={`${label} on Fanbase NG`}
+              text={
+                creator.bio
+                  ? `${creator.bio.slice(0, 100)}${creator.bio.length > 100 ? "…" : ""}`
+                  : `Subscribe to ${label} on Fanbase NG`
+              }
+            />
             <MessageCreatorButton
               creatorId={creator.user_id}
               isLoggedIn={isLoggedIn}
