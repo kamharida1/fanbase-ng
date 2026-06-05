@@ -6,10 +6,12 @@ import { useRef, useState } from "react";
 
 import { uploadFileWithPresign } from "@/lib/media/client-upload";
 import { archivePost, savePost } from "@/lib/posts/actions";
+import { CategoryPicker } from "@/components/vault/category-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { CategoryRow } from "@/lib/vault/queries";
 import type { PostRow } from "@/types/posts";
 
 type PlanOption = { id: string; name: string };
@@ -17,9 +19,13 @@ type PlanOption = { id: string; name: string };
 export function PostEditor({
   post,
   plans,
+  categories = [],
+  assignedCategoryIds = [],
 }: {
   post?: PostRow;
   plans: PlanOption[];
+  categories?: CategoryRow[];
+  assignedCategoryIds?: string[];
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -257,6 +263,17 @@ export function PostEditor({
             </p>
           ) : null}
         </div>
+
+        {categories.length > 0 && (
+          <div className="space-y-2">
+            <Label>Collections</Label>
+            <CategoryPicker
+              postId={postId || null}
+              categories={categories}
+              initialCategoryIds={assignedCategoryIds}
+            />
+          </div>
+        )}
 
         {error ? (
           <p className="text-sm text-destructive" role="alert">

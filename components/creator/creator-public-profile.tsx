@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
+import { CategoryGrid } from "@/components/vault/category-grid";
 import { LivePlayer } from "@/components/live/live-player";
 import { TipButton } from "@/components/tips/tip-button";
 import { PostCard } from "@/components/posts/post-card";
@@ -27,6 +28,8 @@ export function CreatorPublicProfile({
   posts = [],
   liveStream = null,
   tipSuccess = false,
+  categories = [],
+  activeCollectionId = null,
 }: {
   creator: CreatorProfilePublic;
   subscriptionState: CreatorPageSubscriptionState;
@@ -34,6 +37,8 @@ export function CreatorPublicProfile({
   posts?: PostRow[];
   liveStream?: { embedUrl: string; title: string } | null;
   tipSuccess?: boolean;
+  categories?: import("@/lib/vault/queries").CategoryRow[];
+  activeCollectionId?: string | null;
 }) {
   const label = creator.display_name ?? creator.username;
   const initial = label.charAt(0).toUpperCase();
@@ -138,9 +143,23 @@ export function CreatorPublicProfile({
           </section>
         ) : null}
 
+        {categories.length > 0 ? (
+          <div className="mt-8">
+            <CategoryGrid
+              categories={categories}
+              username={creator.username}
+              activeId={activeCollectionId}
+            />
+          </div>
+        ) : null}
+
         {posts.length > 0 ? (
-          <section className="mt-10 space-y-4">
-            <h2 className="text-xl font-semibold">Posts</h2>
+          <section className="mt-6 space-y-4">
+            <h2 className="text-xl font-semibold">
+              {activeCollectionId
+                ? (categories.find((c) => c.id === activeCollectionId)?.name ?? "Posts")
+                : "Posts"}
+            </h2>
             <div className="space-y-6">
               {posts.map((post) => (
                 <PostCard key={post.id} post={post} />

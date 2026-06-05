@@ -7,6 +7,7 @@ import { getAuthContext } from "@/lib/auth/get-auth-context";
 import { getPublicLiveStream } from "@/lib/live/queries";
 import { listCreatorPublishedPosts } from "@/lib/posts/queries";
 import { getCreatorPageSubscriptionState } from "@/lib/subscriptions/queries";
+import { listCreatorCategories, getCategoryPosts } from "@/lib/vault/queries";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createClient } from "@/lib/supabase/server";
 
@@ -17,7 +18,7 @@ export const revalidate = 600;
 
 type PageProps = {
   params: Promise<{ username: string }>;
-  searchParams: Promise<{ tip?: string; reference?: string }>;
+  searchParams: Promise<{ tip?: string; reference?: string; col?: string }>;
 };
 
 // Creator profile metadata is identical for every visitor.
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }: PageProps) {
 
 export default async function CreatorPublicPage({ params, searchParams }: PageProps) {
   const { username } = await params;
-  const { tip } = await searchParams;
+  const { tip, col } = await searchParams;
 
   // Cached: public creator info (name, bio, plans, social links).
   // Same for every visitor — safe to serve from the data cache.
@@ -57,19 +58,22 @@ export default async function CreatorPublicPage({ params, searchParams }: PagePr
   const supabase = await createClient();
   const auth = await getAuthContext(supabase);
 
-  const [subscriptionState, posts, liveStream] = await Promise.all([
+  const [subscriptionState, posts, liveStream, categories] = await Promise.all([
     getCreatorPageSubscriptionState(
       supabase,
       auth?.userId ?? null,
       creator.user_id,
     ),
-    listCreatorPublishedPosts(
-      supabase,
-      creator.user_id,
-      auth?.userId ?? null,
-      12,
-    ),
+    col
+      ? getCategoryPosts(supabase, col, auth?.userId ?? null, 20)
+      : listCreatorPublishedPosts(
+          supabase,
+          creator.user_id,
+          auth?.userId ?? null,
+          12,
+        ),
     getPublicLiveStream(supabase, creator.user_id),
+    listCreatorCategories(supabase, creator.user_id),
   ]);
 
   return (
@@ -87,6 +91,8 @@ export default async function CreatorPublicPage({ params, searchParams }: PagePr
           : null
       }
       tipSuccess={tip === "success"}
+      categories={categories}
+      activeCollectionId={col ?? null}
     />
   );
 }
