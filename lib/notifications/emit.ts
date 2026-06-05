@@ -115,6 +115,43 @@ export async function notifyNewLike(
   });
 }
 
+export async function notifyCreatorLive(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    streamId: string;
+    title: string;
+  },
+): Promise<void> {
+  const creatorLabel = await getProfileLabel(admin, input.creatorId);
+
+  // Fetch up to 100 active subscribers to notify
+  const { data: subs } = await admin
+    .from("subscriptions")
+    .select("fan_id")
+    .eq("creator_id", input.creatorId)
+    .in("status", ["active", "trialing"])
+    .limit(100);
+
+  if (!subs?.length) return;
+
+  await Promise.allSettled(
+    subs.map((sub) =>
+      createNotification(admin, {
+        userId: sub.fan_id,
+        type: "creator_live",
+        title: `${creatorLabel} is live now`,
+        body: input.title,
+        actionUrl: buildAppActionUrl(`/creators/${input.creatorId}/live`),
+        entityType: "live_streams",
+        entityId: input.streamId,
+        metadata: { creator_id: input.creatorId },
+        idempotencyKey: `live:${input.streamId}:${sub.fan_id}`,
+      }),
+    ),
+  );
+}
+
 export async function notifyNewPayout(
   admin: SupabaseClient,
   input: {

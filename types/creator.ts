@@ -52,4 +52,5 @@ export type CreatorListItem = {
   is_verified: boolean;
   plan_count: number;
   min_price_kobo: number | null;
+  is_live?: boolean;
 };

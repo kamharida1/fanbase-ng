@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
+import { LivePlayer } from "@/components/live/live-player";
 import { PostCard } from "@/components/posts/post-card";
 import { VerifiedBadge } from "@/components/creator/verified-badge";
 import { MessageCreatorButton } from "@/components/messaging/message-creator-button";
@@ -23,11 +24,13 @@ export function CreatorPublicProfile({
   subscriptionState,
   isLoggedIn,
   posts = [],
+  liveStream = null,
 }: {
   creator: CreatorProfilePublic;
   subscriptionState: CreatorPageSubscriptionState;
   isLoggedIn: boolean;
   posts?: PostRow[];
+  liveStream?: { embedUrl: string; title: string } | null;
 }) {
   const label = creator.display_name ?? creator.username;
   const initial = label.charAt(0).toUpperCase();
@@ -106,6 +109,16 @@ export function CreatorPublicProfile({
               </a>
             ))}
           </div>
+        ) : null}
+
+        {liveStream ? (
+          <section className="mt-10">
+            <LivePlayer
+              embedUrl={liveStream.embedUrl}
+              title={liveStream.title}
+              creatorName={creator.display_name ?? creator.username}
+            />
+          </section>
         ) : null}
 
         {posts.length > 0 ? (

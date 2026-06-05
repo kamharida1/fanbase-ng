@@ -3,7 +3,8 @@ export type NotificationType =
   | "new_message"
   | "new_comment"
   | "new_like"
-  | "new_payout";
+  | "new_payout"
+  | "creator_live";
 
 export type NotificationStatus = "pending" | "sent" | "failed" | "read";
 

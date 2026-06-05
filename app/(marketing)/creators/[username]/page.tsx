@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { CreatorPublicProfile } from "@/components/creator/creator-public-profile";
 import { getCreatorByUsername } from "@/lib/creators/queries";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
+import { getPublicLiveStream } from "@/lib/live/queries";
 import { listCreatorPublishedPosts } from "@/lib/posts/queries";
 import { getCreatorPageSubscriptionState } from "@/lib/subscriptions/queries";
 import { createPublicClient } from "@/lib/supabase/public";
@@ -52,7 +53,7 @@ export default async function CreatorPublicPage({ params }: PageProps) {
   const supabase = await createClient();
   const auth = await getAuthContext(supabase);
 
-  const [subscriptionState, posts] = await Promise.all([
+  const [subscriptionState, posts, liveStream] = await Promise.all([
     getCreatorPageSubscriptionState(
       supabase,
       auth?.userId ?? null,
@@ -64,6 +65,7 @@ export default async function CreatorPublicPage({ params }: PageProps) {
       auth?.userId ?? null,
       12,
     ),
+    getPublicLiveStream(supabase, creator.user_id),
   ]);
 
   return (
@@ -72,6 +74,14 @@ export default async function CreatorPublicPage({ params }: PageProps) {
       subscriptionState={subscriptionState}
       isLoggedIn={Boolean(auth)}
       posts={posts}
+      liveStream={
+        liveStream
+          ? {
+              embedUrl: liveStream.embed_url ?? "",
+              title: liveStream.title,
+            }
+          : null
+      }
     />
   );
 }

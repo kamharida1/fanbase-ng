@@ -94,6 +94,15 @@ export async function listCreators(
     statsByCreator.set(plan.creator_id, current);
   }
 
+  // Check which creators are currently live
+  const { data: liveRows } = await supabase
+    .from("live_streams")
+    .select("creator_id")
+    .eq("status", "live")
+    .in("creator_id", userIds);
+
+  const liveSet = new Set((liveRows ?? []).map((r) => r.creator_id));
+
   return data.map((row) => {
     const profile = getProfileSnippet(
       row.profiles as ProfileSnippet | ProfileSnippet[],
@@ -108,6 +117,7 @@ export async function listCreators(
       is_verified: row.is_verified,
       plan_count: stats?.count ?? 0,
       min_price_kobo: stats?.min ?? null,
+      is_live: liveSet.has(row.user_id),
     };
   });
 }

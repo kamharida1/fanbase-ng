@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { LiveBadge } from "@/components/live/live-badge";
 import { VerifiedBadge } from "@/components/creator/verified-badge";
 import { formatNgnFromKobo } from "@/lib/creators/format";
 import type { CreatorListItem } from "@/types/creator";
@@ -22,6 +23,11 @@ export function CreatorCard({ creator }: { creator: CreatorListItem }) {
             className="h-full w-full object-cover opacity-50"
           />
         ) : null}
+        {creator.is_live ? (
+          <div className="absolute left-3 top-3">
+            <LiveBadge />
+          </div>
+        ) : null}
       </div>
       <div className="relative px-4 pb-4">
         <div className="-mt-8 mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-4 border-card bg-muted text-xl font-semibold">
@@ -39,6 +45,7 @@ export function CreatorCard({ creator }: { creator: CreatorListItem }) {
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-semibold group-hover:underline">{label}</h2>
           {creator.is_verified ? <VerifiedBadge /> : null}
+          {creator.is_live ? <LiveBadge /> : null}
         </div>
         <p className="text-sm text-muted-foreground">@{creator.username}</p>
         {creator.bio ? (
