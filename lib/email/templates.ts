@@ -585,6 +585,40 @@ export function giftSubscriptionEmail(opts: {
   };
 }
 
+export function kycDecisionEmail(opts: {
+  outcome: "approved" | "rejected";
+  rejectionReason?: string | null;
+}): { subject: string; html: string } {
+  if (opts.outcome === "approved") {
+    return {
+      subject: "Your creator verification has been approved",
+      html: shell({
+        title: "Verification approved",
+        body: `
+          ${h1("✅ You're verified!")}
+          ${p("Your creator account has been reviewed and approved. A verified badge is now shown on your public profile.")}
+          ${p("You can now request payouts without restriction. Keep creating great content!")}
+        `,
+        cta: { label: "Go to your profile", url: `${APP_URL}/creator/profile` },
+      }),
+    };
+  }
+
+  return {
+    subject: "Your verification request was not approved",
+    html: shell({
+      title: "Verification not approved",
+      body: `
+        ${h1("Verification update")}
+        ${p("Unfortunately, your verification request was not approved at this time.")}
+        ${opts.rejectionReason ? p(`<strong>Reason:</strong> ${opts.rejectionReason}`) : ""}
+        ${p("You can update your submission and reapply from your creator profile.")}
+      `,
+      cta: { label: "Reapply", url: `${APP_URL}/creator/profile` },
+    }),
+  };
+}
+
 export function missedCallEmail(opts: {
   callerName: string;
   callType: "voice" | "video";

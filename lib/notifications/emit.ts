@@ -7,6 +7,7 @@ import {
   appealResolvedEmail,
   creatorLiveEmail,
   giftSubscriptionEmail,
+  kycDecisionEmail,
   missedCallEmail,
   newCommentEmail,
   newMessageEmail,
@@ -799,5 +800,51 @@ export async function notifyMissedCall(
       html,
     }),
     "missed_call",
+  );
+}
+
+export async function notifyKycDecision(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    outcome: "approved" | "rejected";
+    rejectionReason?: string | null;
+  },
+): Promise<void> {
+  const title =
+    input.outcome === "approved"
+      ? "Your creator verification was approved"
+      : "Your verification request was not approved";
+  const body =
+    input.outcome === "approved"
+      ? "Congratulations — your account is now verified. Your badge is visible on your profile."
+      : input.rejectionReason
+        ? `Your request was not approved: ${input.rejectionReason}. You can reapply from your profile.`
+        : "Your request was not approved. You can update your submission and reapply from your profile.";
+
+  await createNotification(admin, {
+    userId: input.creatorId,
+    type: "account_status",
+    title,
+    body,
+    actionUrl: buildAppActionUrl("/creator/profile"),
+    entityType: "profiles",
+    entityId: input.creatorId,
+    metadata: { kyc_outcome: input.outcome },
+    idempotencyKey: `kyc_decision:${input.creatorId}:${input.outcome}:${Date.now()}`,
+  });
+
+  const { subject, html } = kycDecisionEmail({
+    outcome: input.outcome,
+    rejectionReason: input.rejectionReason,
+  });
+  fireEmail(
+    sendEmailNotification(admin, {
+      userId: input.creatorId,
+      notificationType: "account_status",
+      subject,
+      html,
+    }),
+    "account_status",
   );
 }

@@ -173,6 +173,16 @@ export async function adminUpdateCreator(
       afterState: payload,
     });
 
+    // Notify creator of KYC outcome so they don't have to poll their profile
+    if (parsed.data.approveVerification || parsed.data.rejectVerification) {
+      const { notifyKycDecision } = await import("@/lib/notifications/emit");
+      await notifyKycDecision(admin, {
+        creatorId: parsed.data.userId,
+        outcome: parsed.data.approveVerification ? "approved" : "rejected",
+        rejectionReason: parsed.data.rejectionReason,
+      }).catch(() => {});
+    }
+
     revalidateAdmin();
     return { success: true };
   } catch (err) {
