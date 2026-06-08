@@ -25,6 +25,11 @@ export type StartLiveResult = {
 export async function startLiveStream(
   title: string,
 ): Promise<LiveActionResult<StartLiveResult>> {
+  const trimmedTitle = title.trim();
+  if (trimmedTitle.length > 150) {
+    return { success: false, error: "Title must be 150 characters or fewer." };
+  }
+
   const supabase = await createClient();
   const auth = await requireAuth(supabase);
 
@@ -185,10 +190,24 @@ export async function endLiveStream(
 
 /** Polls Cloudflare for connection status — called from the creator's go-live panel. */
 export async function pollLiveStreamStatus(
-  cloudflareUid: string,
+  streamId: string,
 ): Promise<{ connected: boolean }> {
   try {
-    const status = await getLiveInputStatus(cloudflareUid);
+    const supabase = await createClient();
+    const auth = await requireAuth(supabase);
+    const admin = createAdminClient();
+
+    // Resolve cloudflareUid from DB — never trust client-provided value directly
+    const { data: stream } = await admin
+      .from("live_streams")
+      .select("cloudflare_uid")
+      .eq("id", streamId)
+      .eq("creator_id", auth.userId)
+      .maybeSingle();
+
+    if (!stream?.cloudflare_uid) return { connected: false };
+
+    const status = await getLiveInputStatus(stream.cloudflare_uid);
     return { connected: status.connected };
   } catch {
     return { connected: false };

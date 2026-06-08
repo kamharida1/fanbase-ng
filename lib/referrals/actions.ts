@@ -36,11 +36,10 @@ export async function recordReferral(
       { onConflict: "referee_id", ignoreDuplicates: true },
     );
 
-  // Increment uses_count
-  await admin
-    .from("referral_codes")
-    .update({ uses_count: 999 }) // will be corrected by a future aggregate; best-effort
-    .eq("id", codeRow.id);
+  // Atomic increment — function defined in 20260620000001_security_hardening.sql
+  void Promise.resolve(
+    admin.rpc("increment_referral_code_uses", { p_code_id: codeRow.id }),
+  );
 }
 
 /**

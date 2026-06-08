@@ -17,11 +17,19 @@ export async function createOffer(input: {
   durationHours: number;
   maxRedemptions?: number;
 }): Promise<OfferResult<{ offerId: string }>> {
+  const label = input.label?.trim() ?? "";
+  if (!label) return { success: false, error: "Offer label is required." };
+  if (label.length > 100) return { success: false, error: "Label must be 100 characters or fewer." };
   if (input.discountPct < 1 || input.discountPct > 99) {
     return { success: false, error: "Discount must be between 1% and 99%." };
   }
-  if (input.durationHours < 1) {
-    return { success: false, error: "Duration must be at least 1 hour." };
+  if (input.durationHours < 1 || input.durationHours > 8760) {
+    return { success: false, error: "Duration must be between 1 and 8760 hours." };
+  }
+  if (input.maxRedemptions !== undefined && input.maxRedemptions !== null) {
+    if (!Number.isInteger(input.maxRedemptions) || input.maxRedemptions < 1 || input.maxRedemptions > 100_000) {
+      return { success: false, error: "Max redemptions must be between 1 and 100,000." };
+    }
   }
 
   const supabase = await createClient();
@@ -46,7 +54,7 @@ export async function createOffer(input: {
     .insert({
       creator_id: auth.userId,
       plan_id: input.planId,
-      label: input.label.trim(),
+      label,
       discount_pct: input.discountPct,
       ends_at: endsAt,
       max_redemptions: input.maxRedemptions ?? null,

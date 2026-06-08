@@ -97,11 +97,20 @@ export async function deleteCategory(categoryId: string): Promise<VaultResult> {
   return { success: true };
 }
 
+const MAX_CATEGORIES_PER_POST = 20;
+
 /** Replaces all category assignments for a post with the given set. */
 export async function setPostCategories(input: {
   postId: string;
   categoryIds: string[];
 }): Promise<VaultResult> {
+  if (!Array.isArray(input.categoryIds)) {
+    return { success: false, error: "Invalid category list." };
+  }
+  if (input.categoryIds.length > MAX_CATEGORIES_PER_POST) {
+    return { success: false, error: `Maximum ${MAX_CATEGORIES_PER_POST} categories per post.` };
+  }
+
   const supabase = await createClient();
   const auth = await requireAuth(supabase);
 
