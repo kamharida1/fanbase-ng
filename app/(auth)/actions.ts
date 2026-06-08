@@ -8,7 +8,113 @@ import { getDefaultPathForRole } from "@/lib/auth/rbac";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
 import { canAccessPath } from "@/lib/auth/paths";
 import { insertUserSession } from "@/lib/auth/session";
+import { mapAuthError } from "@/lib/auth/errors";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+
+const MIN_AGE_YEARS = 18;
+
+async function getIp(): Promise<string> {
+  const h = await headers();
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+}
+
+function isOldEnough(dobString: string): boolean {
+  const dob = new Date(dobString);
+  if (isNaN(dob.getTime())) return false;
+  const today = new Date();
+  const age =
+    today.getFullYear() - dob.getFullYear() -
+    (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+  return age >= MIN_AGE_YEARS;
+}
+
+export type AuthActionResult =
+  | { success: true; requiresEmailVerification?: boolean }
+  | { success: false; error: string; retryAfter?: number };
+
+export async function signInWithEmail(
+  email: string,
+  password: string,
+): Promise<AuthActionResult> {
+  const ip = await getIp();
+  const key = `authLogin:${email.trim().toLowerCase()}:${ip}`;
+  const rl = await checkRateLimit(key, RATE_LIMITS.authLogin);
+  if (!rl.ok) {
+    return {
+      success: false,
+      error: `Too many login attempts. Try again in ${rl.retryAfterSeconds}s.`,
+      retryAfter: rl.retryAfterSeconds,
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
+
+  if (error) {
+    return { success: false, error: mapAuthError(error.message) };
+  }
+
+  return { success: true };
+}
+
+export async function signUpWithEmail(input: {
+  email: string;
+  password: string;
+  displayName?: string;
+  username?: string;
+  dateOfBirth: string;
+  refCode?: string;
+}): Promise<AuthActionResult> {
+  const ip = await getIp();
+  const key = `authSignup:${ip}`;
+  const rl = await checkRateLimit(key, RATE_LIMITS.authSignup);
+  if (!rl.ok) {
+    return {
+      success: false,
+      error: `Too many signup attempts. Try again in ${rl.retryAfterSeconds}s.`,
+      retryAfter: rl.retryAfterSeconds,
+    };
+  }
+
+  if (!isOldEnough(input.dateOfBirth)) {
+    return {
+      success: false,
+      error: "You must be at least 18 years old to create an account.",
+    };
+  }
+
+  const supabase = await createClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const refPart = input.refCode
+    ? `&ref=${encodeURIComponent(input.refCode)}`
+    : "";
+
+  const { data, error } = await supabase.auth.signUp({
+    email: input.email.trim().toLowerCase(),
+    password: input.password,
+    options: {
+      data: {
+        display_name: input.displayName?.trim() || undefined,
+        username: input.username?.trim().toLowerCase() || undefined,
+        date_of_birth: input.dateOfBirth,
+      },
+      emailRedirectTo: `${appUrl}/callback?next=/feed${refPart}`,
+    },
+  });
+
+  if (error) {
+    return { success: false, error: mapAuthError(error.message) };
+  }
+
+  return {
+    success: true,
+    requiresEmailVerification: !data.session,
+  };
+}
 
 export async function signOut() {
   const supabase = await createClient();

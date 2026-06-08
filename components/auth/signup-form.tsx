@@ -4,18 +4,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { recordSession, resolvePostLoginPath } from "@/app/(auth)/actions";
+import {
+  recordSession,
+  resolvePostLoginPath,
+  signUpWithEmail,
+} from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PASSWORD_MIN_LENGTH, USERNAME_PATTERN } from "@/lib/auth/constants";
-import { mapAuthError } from "@/lib/auth/errors";
-import { createClient } from "@/lib/supabase/client";
+
+// Latest DOB that still makes someone 18 today
+function maxDob(): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  return d.toISOString().split("T")[0]!;
+}
 
 export function SignupForm() {
   const router = useRouter();
 
-  // Capture referral code from URL (?ref=CODE) to pass through the email link
   const refCode =
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("ref") ?? ""
@@ -26,6 +34,7 @@ export function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [consentChecked, setConsentChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -52,36 +61,36 @@ export function SignupForm() {
       return;
     }
 
+    if (!dateOfBirth) {
+      setError("Please enter your date of birth.");
+      return;
+    }
+
     if (!consentChecked) {
-      setError("You must agree to the Terms of Service and Privacy Policy to create an account.");
+      setError(
+        "You must agree to the Terms of Service and Privacy Policy to create an account.",
+      );
       return;
     }
 
     setLoading(true);
 
-    const supabase = createClient();
-    const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
-
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
+    const result = await signUpWithEmail({
+      email,
       password,
-      options: {
-        data: {
-          display_name: displayName.trim() || undefined,
-          username: normalizedUsername || undefined,
-        },
-        emailRedirectTo: `${appUrl}/callback?next=/feed${refCode ? `&ref=${encodeURIComponent(refCode)}` : ""}`,
-      },
+      displayName: displayName || undefined,
+      username: normalizedUsername || undefined,
+      dateOfBirth,
+      refCode: refCode || undefined,
     });
 
-    if (signUpError) {
+    if (!result.success) {
       setLoading(false);
-      setError(mapAuthError(signUpError.message));
+      setError(result.error);
       return;
     }
 
-    if (data.session) {
+    if (!result.requiresEmailVerification) {
       await recordSession(
         typeof navigator !== "undefined" ? navigator.userAgent : undefined,
       );
@@ -156,7 +165,24 @@ export function SignupForm() {
           onChange={(e) => setConfirmPassword(e.target.value)}
         />
       </div>
-      {/* NDPR consent — required before account creation */}
+
+      {/* Age verification — validated server-side; max= enforces 18+ in browser too */}
+      <div className="space-y-2">
+        <Label htmlFor="dateOfBirth">Date of birth</Label>
+        <Input
+          id="dateOfBirth"
+          type="date"
+          required
+          max={maxDob()}
+          value={dateOfBirth}
+          onChange={(e) => setDateOfBirth(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          You must be at least 18 years old to use this platform.
+        </p>
+      </div>
+
+      {/* NDPR consent */}
       <label className="flex items-start gap-3 rounded-lg border p-3 text-sm">
         <input
           type="checkbox"
@@ -187,12 +213,17 @@ export function SignupForm() {
           in accordance with the Nigeria Data Protection Regulation (NDPR) 2019.
         </span>
       </label>
+
       {error ? (
         <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
       ) : null}
-      <Button type="submit" className="w-full" disabled={loading || !consentChecked}>
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={loading || !consentChecked}
+      >
         {loading ? "Creating account…" : "Create account"}
       </Button>
       <p className="text-center text-sm">

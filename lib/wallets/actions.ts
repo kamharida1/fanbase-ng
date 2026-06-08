@@ -144,6 +144,20 @@ export async function requestWithdrawal(
     return { success: false, error: "Creator account required." };
   }
 
+  const { data: kycRow } = await supabase
+    .from("profiles")
+    .select("kyc_status")
+    .eq("id", auth.userId)
+    .single();
+
+  if (kycRow?.kyc_status !== "verified") {
+    return {
+      success: false,
+      error:
+        "Identity verification required before withdrawing. Please complete KYC in your profile settings.",
+    };
+  }
+
   const wallet = await getCreatorWallet(supabase, auth.userId);
   if (!wallet) {
     return { success: false, error: "Wallet not found." };

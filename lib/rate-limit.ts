@@ -121,4 +121,9 @@ export const RATE_LIMITS = {
   mediaDelivery: { limit: 120, windowSeconds: 60 },
   paymentVerify: { limit: 10, windowSeconds: 60 },
   creatorsPublic: { limit: 60, windowSeconds: 60 },
+  // Auth: tight limits to block credential stuffing
+  authLogin: { limit: 10, windowSeconds: 60 },
+  authSignup: { limit: 5, windowSeconds: 60 },
+  // Paystack webhook: protect against flood before HMAC check
+  paystackWebhook: { limit: 60, windowSeconds: 60 },
 } as const;

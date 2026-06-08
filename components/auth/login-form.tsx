@@ -7,12 +7,11 @@ import { useState } from "react";
 import {
   recordSession,
   resolvePostLoginPath,
+  signInWithEmail,
 } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { mapAuthError } from "@/lib/auth/errors";
-import { createClient } from "@/lib/supabase/client";
 
 export function LoginForm() {
   const router = useRouter();
@@ -29,15 +28,11 @@ export function LoginForm() {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+    const result = await signInWithEmail(email, password);
 
-    if (signInError) {
+    if (!result.success) {
       setLoading(false);
-      setError(mapAuthError(signInError.message));
+      setError(result.error);
       return;
     }
 

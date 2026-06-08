@@ -9,6 +9,7 @@ import {
 import { dispatchPaystackWebhook } from "@/lib/paystack/webhook-handler";
 import type { PaystackWebhookBody } from "@/lib/paystack/types";
 import { verifyPaystackSignature } from "@/lib/paystack/verify";
+import { enforceRateLimit } from "@/lib/rate-limit-http";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function requestIdFrom(request: Request): string {
@@ -20,6 +21,9 @@ function requestIdFrom(request: Request): string {
 }
 
 export async function POST(request: Request) {
+  const rl = await enforceRateLimit(request, "paystackWebhook", "webhook");
+  if (rl) return rl;
+
   const requestId = requestIdFrom(request);
   const signature = request.headers.get("x-paystack-signature");
   const rawBody = await request.text();
