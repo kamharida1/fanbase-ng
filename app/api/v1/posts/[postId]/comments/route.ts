@@ -31,7 +31,14 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ data: { comments: [] } });
   }
 
-  const comments = await listPostComments(supabase, postId);
+  const { data: postRow } = await supabase
+    .from("posts")
+    .select("creator_id")
+    .eq("id", postId)
+    .maybeSingle();
+
+  const isCreator = postRow?.creator_id === authResult.ctx.userId;
+  const comments = await listPostComments(supabase, postId, { includeHidden: isCreator });
 
   return NextResponse.json(
     { data: { comments } },

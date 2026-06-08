@@ -33,6 +33,7 @@ export type PostRow = {
   creator_id: string;
   type: PostType;
   caption: string | null;
+  content_warning: string | null;
   visibility: PostVisibility;
   plan_id: string | null;
   ppv_price_kobo: number | null;
@@ -43,12 +44,36 @@ export type PostRow = {
   created_at: string;
   updated_at: string;
   stats_cache: PostStats;
+  is_pinned?: boolean;
+  poll?: PostPoll | null;
   author?: PostAuthor;
   media?: PostMediaRow[];
   liked_by_me?: boolean;
   can_view_full?: boolean;
   comment_count?: number;
   like_count?: number;
+};
+
+export type PollOption = {
+  id: string;
+  label: string;
+  sort_order: number;
+  vote_count: number;
+};
+
+export type PostPoll = {
+  id: string;
+  post_id: string;
+  question: string;
+  closes_at: string | null;
+  options: PollOption[];
+  total_votes: number;
+  my_vote_option_id: string | null;
+};
+
+export type TrendingHashtag = {
+  hashtag: string;
+  post_count: number;
 };
 
 export type PostCommentRow = {
@@ -59,5 +84,6 @@ export type PostCommentRow = {
   parent_id: string | null;
   created_at: string;
   is_pinned?: boolean;
+  is_hidden_by_creator?: boolean;
   author?: PostAuthor;
 };

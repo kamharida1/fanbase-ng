@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { Send, Users } from "lucide-react";
 
 import {
-  getActiveSubscriberCount,
+  getAudienceCount,
+  listCreatorBroadcastPlans,
   sendBroadcast,
+  type BroadcastPlanOption,
+  type BroadcastSegment,
 } from "@/lib/broadcast/actions";
 import { formatNgnFromKobo } from "@/lib/creators/format";
 import { Button } from "@/components/ui/button";
@@ -15,20 +18,47 @@ import { Textarea } from "@/components/ui/textarea";
 
 const TIP_KOBO_PRESETS = [50_000, 100_000, 200_000, 500_000];
 
+const SEGMENT_OPTIONS: { value: BroadcastSegment; label: string }[] = [
+  { value: "active", label: "Active subscribers" },
+  { value: "new", label: "New subscribers (last 30 days)" },
+  { value: "longtime", label: "Long-time subscribers (90+ days)" },
+  { value: "lapsing", label: "Lapsing soon (set to cancel)" },
+];
+
 type Result = { sentCount: number; totalCount: number } | null;
 
 export function BroadcastComposer({ creatorId }: { creatorId: string }) {
   const [body, setBody] = useState("");
   const [isPpv, setIsPpv] = useState(false);
   const [ppvNgn, setPpvNgn] = useState("");
+  const [plans, setPlans] = useState<BroadcastPlanOption[]>([]);
+  const [planId, setPlanId] = useState<string>("");
+  const [segment, setSegment] = useState<BroadcastSegment>("active");
   const [subCount, setSubCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result>(null);
 
   useEffect(() => {
-    getActiveSubscriberCount(creatorId).then(setSubCount);
+    listCreatorBroadcastPlans(creatorId).then(setPlans);
   }, [creatorId]);
+
+  const audience = {
+    planId: planId || null,
+    segment,
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    setSubCount(null);
+    getAudienceCount(creatorId, audience).then((count) => {
+      if (!cancelled) setSubCount(count);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creatorId, planId, segment]);
 
   const ppvKobo = isPpv && ppvNgn ? Math.round(parseFloat(ppvNgn) * 100) : null;
 
@@ -41,6 +71,7 @@ export function BroadcastComposer({ creatorId }: { creatorId: string }) {
       body,
       isPpv,
       ppvPriceKobo: ppvKobo,
+      audience,
     });
 
     setLoading(false);
@@ -75,8 +106,43 @@ export function BroadcastComposer({ creatorId }: { creatorId: string }) {
           {subCount === null
             ? "Loading…"
             : subCount === 0
-              ? "No active subscribers"
-              : `${subCount.toLocaleString()} subscriber${subCount !== 1 ? "s" : ""}`}
+              ? "No subscribers match"
+              : `${subCount.toLocaleString()} recipient${subCount !== 1 ? "s" : ""}`}
+        </div>
+      </div>
+
+      {/* Audience */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label>Tier</Label>
+          <select
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={planId}
+            onChange={(e) => setPlanId(e.target.value)}
+            disabled={loading}
+          >
+            <option value="">All tiers</option>
+            {plans.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({formatNgnFromKobo(p.price_kobo)})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Segment</Label>
+          <select
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={segment}
+            onChange={(e) => setSegment(e.target.value as BroadcastSegment)}
+            disabled={loading}
+          >
+            {SEGMENT_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -166,7 +232,7 @@ export function BroadcastComposer({ creatorId }: { creatorId: string }) {
           {result.sentCount < result.totalCount
             ? ` of ${result.totalCount.toLocaleString()}`
             : ""}{" "}
-          subscriber{result.sentCount !== 1 ? "s" : ""}
+          recipient{result.sentCount !== 1 ? "s" : ""}
           {isPpv && ppvKobo
             ? ` — locked at ${formatNgnFromKobo(ppvKobo)}`
             : ""}
@@ -186,19 +252,20 @@ export function BroadcastComposer({ creatorId }: { creatorId: string }) {
           {loading
             ? "Sending…"
             : subCount
-              ? `Send to ${subCount.toLocaleString()} subscriber${subCount !== 1 ? "s" : ""}`
+              ? `Send to ${subCount.toLocaleString()} recipient${subCount !== 1 ? "s" : ""}`
               : "Send"}
         </Button>
         {subCount === 0 && (
           <p className="text-sm text-muted-foreground">
-            You need active subscribers to send a broadcast.
+            No subscribers match this audience.
           </p>
         )}
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Messages land in each subscriber&apos;s inbox. First 500 active
-        subscribers are reached per send.
+        Messages land in each recipient&apos;s inbox. Narrow your audience by
+        tier or subscriber segment above. The first 500 matching subscribers
+        are reached per send.
       </p>
     </div>
   );

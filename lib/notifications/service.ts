@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { sendPushNotification } from "@/lib/push/send";
 import { buildAppActionUrl, toSafeNotificationHref } from "@/lib/security/safe-url";
 import type { NotificationType } from "@/types/notifications";
 
@@ -42,5 +43,18 @@ export async function createNotification(
     return null;
   }
 
-  return (data as string | null) ?? null;
+  const notificationId = (data as string | null) ?? null;
+
+  // Fire-and-forget: never let a push delivery failure break notification creation.
+  if (notificationId) {
+    sendPushNotification(admin, {
+      userId: input.userId,
+      notificationType: input.type,
+      title: input.title,
+      body: input.body,
+      actionUrl,
+    }).catch((err) => console.error("[push] notify", input.type, err));
+  }
+
+  return notificationId;
 }

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import { MessagingInbox } from "@/components/messaging/messaging-inbox";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
+import { buildWatermarkLabel } from "@/lib/media/watermark";
 import {
   countPendingRequests,
   getConversation,
@@ -19,6 +20,11 @@ export default async function CreatorMessagesPage({ searchParams }: PageProps) {
   const supabase = await createClient();
   const auth = await getAuthContext(supabase);
   if (!auth) redirect("/login?next=/creator/messages");
+
+  const watermarkLabel = buildWatermarkLabel({
+    username: auth.profile.username,
+    userId: auth.userId,
+  });
 
   const params = await searchParams;
   const filter = params.tab === "requests" ? "requests" : "inbox";
@@ -70,6 +76,9 @@ export default async function CreatorMessagesPage({ searchParams }: PageProps) {
           currentUserId={auth.userId}
           role="creator"
           requestCount={requestCount}
+          watermarkLabel={watermarkLabel}
+          callerUsername={auth.profile.username}
+          callerDisplayName={auth.profile.display_name}
         />
       </Suspense>
     </div>

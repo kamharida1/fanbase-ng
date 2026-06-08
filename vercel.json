@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/internal/cron/publish-scheduled-posts",
-      "schedule": "0 5 * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/internal/cron/expire-media-uploads",
@@ -19,6 +19,18 @@
     {
       "path": "/api/internal/cron/expire-stories",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/internal/cron/subscription-winback",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/internal/cron/email-digests",
+      "schedule": "0 9 * * 0"
+    },
+    {
+      "path": "/api/internal/cron/process-account-deletions",
+      "schedule": "0 7 * * *"
     }
   ]
 }

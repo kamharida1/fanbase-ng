@@ -14,6 +14,8 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { href: "/admin/users", label: "Users", minRole: "admin" },
   { href: "/admin/creators", label: "Creators", minRole: "admin" },
   { href: "/admin/payouts", label: "Payouts", minRole: "admin" },
+  { href: "/admin/disputes", label: "Disputes", minRole: "admin" },
+  { href: "/admin/appeals", label: "Appeals", minRole: "admin" },
   { href: "/admin/finance", label: "Finance", minRole: "admin" },
   { href: "/admin/analytics", label: "Analytics", minRole: "admin" },
   { href: "/admin/audit", label: "Audit", minRole: "admin" },

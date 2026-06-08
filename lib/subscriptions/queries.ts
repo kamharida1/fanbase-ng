@@ -22,6 +22,7 @@ export async function listFanSubscriptions(
       cancel_at_period_end,
       cancelled_at,
       ended_at,
+      paused_at,
       created_at,
       subscription_plans (
         id,
@@ -76,6 +77,7 @@ export async function listFanSubscriptions(
       cancel_at_period_end: row.cancel_at_period_end,
       cancelled_at: row.cancelled_at,
       ended_at: row.ended_at,
+      paused_at: (row as { paused_at?: string | null }).paused_at ?? null,
       created_at: row.created_at,
       plan: plan
         ? {
@@ -95,6 +97,53 @@ export async function listFanSubscriptions(
         : undefined,
     };
   });
+}
+
+export type WinBackCandidate = {
+  subscriptionId: string;
+  fanId: string;
+  creatorId: string;
+  creatorUsername: string;
+  planName: string;
+};
+
+export async function findWinBackCandidates(
+  admin: SupabaseClient,
+  windowStart: Date,
+  windowEnd: Date,
+): Promise<WinBackCandidate[]> {
+  const { data } = await admin
+    .from("subscriptions")
+    .select("id, fan_id, creator_id, ended_at, subscription_plans (name)")
+    .eq("status", "expired")
+    .gte("ended_at", windowStart.toISOString())
+    .lt("ended_at", windowEnd.toISOString());
+
+  if (!data?.length) return [];
+
+  const creatorIds = [...new Set(data.map((r) => r.creator_id))];
+  const { data: profiles } = await admin
+    .from("profiles")
+    .select("id, username")
+    .in("id", creatorIds);
+
+  const usernames = new Map((profiles ?? []).map((p) => [p.id, p.username as string]));
+
+  return data
+    .map((row) => {
+      const username = usernames.get(row.creator_id);
+      if (!username) return null;
+      const planRaw = row.subscription_plans as { name: string } | { name: string }[] | null;
+      const planName = Array.isArray(planRaw) ? planRaw[0]?.name : planRaw?.name;
+      return {
+        subscriptionId: row.id,
+        fanId: row.fan_id,
+        creatorId: row.creator_id,
+        creatorUsername: username,
+        planName: planName ?? "your plan",
+      };
+    })
+    .filter((row): row is WinBackCandidate => row !== null);
 }
 
 export async function getFanSubscriptionToCreator(

@@ -7,13 +7,18 @@ import type { OfferRow } from "@/lib/offers/queries";
 import { LivePlayer } from "@/components/live/live-player";
 import { ShareButton } from "@/components/shared/share-button";
 import { TipButton } from "@/components/tips/tip-button";
+import { BlockCreatorButton } from "@/components/creators/block-creator-button";
+import { ReportButton } from "@/components/shared/report-button";
 import { PostCard } from "@/components/posts/post-card";
 import { VerifiedBadge } from "@/components/creator/verified-badge";
 import { MessageCreatorButton } from "@/components/messaging/message-creator-button";
+import { GiftSubscriptionButton } from "@/components/subscriptions/gift-subscription-button";
 import { SubscribeButton } from "@/components/subscriptions/subscribe-button";
 import { formatPlanPrice } from "@/lib/subscriptions/format";
+import { formatNgnFromKobo } from "@/lib/creators/format";
 import type { CreatorPageSubscriptionState } from "@/lib/subscriptions/queries";
 import type { CreatorProfilePublic, SocialLinks } from "@/types/creator";
+import type { SubscriptionPlanBundleRow } from "@/types/subscription";
 import type { PostRow } from "@/types/posts";
 
 const SOCIAL_LABELS: Record<keyof SocialLinks, string> = {
@@ -28,22 +33,30 @@ export function CreatorPublicProfile({
   creator,
   subscriptionState,
   isLoggedIn,
+  isOwnProfile = false,
+  isBlockedByFan = false,
   posts = [],
   liveStream = null,
   tipSuccess = false,
   categories = [],
   activeCollectionId = null,
   planOffers = new Map(),
+  planBundles = new Map(),
+  watermarkLabel = null,
 }: {
   creator: CreatorProfilePublic;
   subscriptionState: CreatorPageSubscriptionState;
   isLoggedIn: boolean;
+  isOwnProfile?: boolean;
+  isBlockedByFan?: boolean;
   posts?: PostRow[];
   liveStream?: { embedUrl: string; title: string } | null;
   tipSuccess?: boolean;
   categories?: import("@/lib/vault/queries").CategoryRow[];
   activeCollectionId?: string | null;
   planOffers?: Map<string, OfferRow>;
+  planBundles?: Map<string, SubscriptionPlanBundleRow[]>;
+  watermarkLabel?: string | null;
 }) {
   const label = creator.display_name ?? creator.username;
   const initial = label.charAt(0).toUpperCase();
@@ -68,7 +81,7 @@ export function CreatorPublicProfile({
       </div>
 
       <div className="mx-auto max-w-4xl px-4 sm:px-6">
-        <div className="-mt-12 flex flex-col gap-4 sm:-mt-16 sm:flex-row sm:items-end sm:justify-between">
+        <div className="relative -mt-12 flex flex-col gap-4 sm:-mt-16 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex min-w-0 items-end gap-3 sm:gap-4">
             <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-background bg-muted text-2xl font-bold shadow-sm sm:h-28 sm:w-28 sm:text-3xl">
               {creator.avatar_url ? (
@@ -107,6 +120,16 @@ export function CreatorPublicProfile({
               isLoggedIn={isLoggedIn}
               loginNext={loginNext}
             />
+            {isLoggedIn && !isOwnProfile && (
+              <BlockCreatorButton
+                creatorId={creator.user_id}
+                creatorUsername={creator.username}
+                initialBlocked={isBlockedByFan}
+              />
+            )}
+            {isLoggedIn && !isOwnProfile && (
+              <ReportButton reportedUserId={creator.user_id} label="Report account" />
+            )}
           </div>
         </div>
 
@@ -176,7 +199,12 @@ export function CreatorPublicProfile({
             </h2>
             <div className="space-y-6">
               {posts.map((post) => (
-                <PostCard key={post.id} post={post} />
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  isOwnProfile={isOwnProfile}
+                  watermarkLabel={watermarkLabel}
+                />
               ))}
             </div>
           </section>
@@ -230,6 +258,58 @@ export function CreatorPublicProfile({
                     loginNext={loginNext}
                     offerId={planOffers.get(plan.id)?.id}
                   />
+                  {plan.billing_interval === "monthly" ? (
+                    <div className="mt-2">
+                      <GiftSubscriptionButton
+                        planId={plan.id}
+                        planName={plan.name}
+                        priceKobo={plan.price_kobo}
+                        isLoggedIn={isLoggedIn}
+                        loginNext={loginNext}
+                      />
+                    </div>
+                  ) : null}
+                  {(planBundles.get(plan.id)?.length ?? 0) > 0 ? (
+                    <div className="mt-4 space-y-3 border-t pt-4">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Prepay &amp; save
+                      </p>
+                      {planBundles.get(plan.id)!.map((bundle) => {
+                        const totalKobo = plan.price_kobo * bundle.months;
+                        const discountedKobo = Math.round(
+                          totalKobo * (1 - bundle.discount_pct / 100),
+                        );
+                        return (
+                          <div key={bundle.id} className="rounded-lg border p-3">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <p className="text-sm font-medium">
+                                {bundle.months} months upfront
+                              </p>
+                              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                Save {bundle.discount_pct}%
+                              </p>
+                            </div>
+                            <p className="mt-1 text-sm">
+                              {formatNgnFromKobo(discountedKobo)}{" "}
+                              <span className="text-xs text-muted-foreground line-through">
+                                {formatNgnFromKobo(totalKobo)}
+                              </span>
+                            </p>
+                            <SubscribeButton
+                              planId={plan.id}
+                              planName={plan.name}
+                              isFree={false}
+                              subscriptionState={subscriptionState}
+                              isLoggedIn={isLoggedIn}
+                              loginNext={loginNext}
+                              bundleId={bundle.id}
+                              label={`Prepay for ${bundle.months} months`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>

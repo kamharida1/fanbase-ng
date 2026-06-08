@@ -4,11 +4,14 @@ import { notFound } from "next/navigation";
 import { CreatorPublicProfile } from "@/components/creator/creator-public-profile";
 import { getCreatorByUsername } from "@/lib/creators/queries";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
+import { buildWatermarkLabel } from "@/lib/media/watermark";
 import { getPublicLiveStream } from "@/lib/live/queries";
 import { listCreatorPublishedPosts } from "@/lib/posts/queries";
 import { getCreatorPageSubscriptionState } from "@/lib/subscriptions/queries";
 import { listCreatorCategories, getCategoryPosts } from "@/lib/vault/queries";
 import { getActivePlanOffers } from "@/lib/offers/queries";
+import { getActivePlanBundles } from "@/lib/subscriptions/bundles";
+import { isFanBlockingCreator } from "@/lib/creators/block-actions";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createClient } from "@/lib/supabase/server";
 
@@ -59,7 +62,12 @@ export default async function CreatorPublicPage({ params, searchParams }: PagePr
   const supabase = await createClient();
   const auth = await getAuthContext(supabase);
 
-  const [subscriptionState, posts, liveStream, categories, planOffers] = await Promise.all([
+  const isOwnProfile = auth?.userId === creator.user_id;
+  const watermarkLabel = auth
+    ? buildWatermarkLabel({ username: auth.profile.username, userId: auth.userId })
+    : null;
+
+  const [subscriptionState, posts, liveStream, categories, planOffers, planBundles, isBlockedByFan] = await Promise.all([
     getCreatorPageSubscriptionState(
       supabase,
       auth?.userId ?? null,
@@ -76,6 +84,10 @@ export default async function CreatorPublicPage({ params, searchParams }: PagePr
     getPublicLiveStream(supabase, creator.user_id),
     listCreatorCategories(supabase, creator.user_id),
     getActivePlanOffers(supabase, creator.plans.map((p) => p.id)),
+    getActivePlanBundles(supabase, creator.plans.map((p) => p.id)),
+    auth && !isOwnProfile
+      ? isFanBlockingCreator(supabase, auth.userId, creator.user_id)
+      : Promise.resolve(false),
   ]);
 
   return (
@@ -83,6 +95,8 @@ export default async function CreatorPublicPage({ params, searchParams }: PagePr
       creator={creator}
       subscriptionState={subscriptionState}
       isLoggedIn={Boolean(auth)}
+      isOwnProfile={isOwnProfile}
+      isBlockedByFan={isBlockedByFan}
       posts={posts}
       liveStream={
         liveStream
@@ -96,6 +110,8 @@ export default async function CreatorPublicPage({ params, searchParams }: PagePr
       categories={categories}
       activeCollectionId={col ?? null}
       planOffers={planOffers}
+      planBundles={planBundles}
+      watermarkLabel={watermarkLabel}
     />
   );
 }

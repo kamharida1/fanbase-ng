@@ -8,6 +8,13 @@ import { formatAdminDate } from "@/lib/admin/format";
 import { Button } from "@/components/ui/button";
 import type { AdminCreatorRow } from "@/types/admin";
 
+const KYC_LABELS: Record<string, string> = {
+  none: "—",
+  pending: "Pending",
+  verified: "Approved",
+  rejected: "Rejected",
+};
+
 export function CreatorsManager({
   creators,
   total,
@@ -23,6 +30,8 @@ export function CreatorsManager({
   const [search, setSearch] = useState(q);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   async function patch(
     userId: string,
@@ -30,6 +39,9 @@ export function CreatorsManager({
       isVerified?: boolean;
       isAcceptingSubscribers?: boolean;
       feedPriority?: number;
+      approveVerification?: boolean;
+      rejectVerification?: boolean;
+      rejectionReason?: string;
     },
   ) {
     setLoadingId(userId);
@@ -66,12 +78,77 @@ export function CreatorsManager({
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <p className="text-sm text-muted-foreground">{total} creators</p>
 
+      {/* Pending verification requests surfaced at top */}
+      {creators.some((c) => c.kyc_status === "pending") && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+          <p className="mb-3 text-sm font-semibold text-amber-900 dark:text-amber-100">
+            Pending verification requests
+          </p>
+          <ul className="space-y-3">
+            {creators.filter((c) => c.kyc_status === "pending").map((c) => (
+              <li key={c.user_id} className="rounded-lg border bg-background p-3 space-y-2">
+                <p className="font-medium text-sm">@{c.username} {c.display_name ? `(${c.display_name})` : ""}</p>
+                {c.verification_note && (
+                  <p className="text-sm text-muted-foreground">{c.verification_note}</p>
+                )}
+                {rejectingId === c.user_id ? (
+                  <div className="space-y-2">
+                    <input
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      placeholder="Rejection reason (shown to creator)…"
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={loadingId === c.user_id}
+                        onClick={async () => {
+                          await patch(c.user_id, { rejectVerification: true, rejectionReason: rejectReason });
+                          setRejectingId(null);
+                          setRejectReason("");
+                        }}
+                      >
+                        Confirm reject
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setRejectingId(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={loadingId === c.user_id}
+                      onClick={() => void patch(c.user_id, { approveVerification: true })}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={loadingId === c.user_id}
+                      onClick={() => { setRejectingId(c.user_id); setRejectReason(""); }}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-xl border">
         <table className="w-full min-w-[560px] text-sm">
           <thead className="border-b bg-muted/50 text-left">
             <tr>
               <th className="p-3">Creator</th>
               <th className="p-3">Verified</th>
+              <th className="p-3">Verif. request</th>
               <th className="p-3">Subs open</th>
               <th className="p-3">Feed priority</th>
               <th className="p-3">Joined</th>
@@ -88,6 +165,11 @@ export function CreatorsManager({
                   </p>
                 </td>
                 <td className="p-3">{c.is_verified ? "Yes" : "No"}</td>
+                <td className="p-3">
+                  <span className={`text-xs font-medium ${c.kyc_status === "pending" ? "text-amber-600 dark:text-amber-400" : c.kyc_status === "verified" ? "text-green-600 dark:text-green-400" : c.kyc_status === "rejected" ? "text-destructive" : "text-muted-foreground"}`}>
+                    {KYC_LABELS[c.kyc_status] ?? "—"}
+                  </span>
+                </td>
                 <td className="p-3">
                   {c.is_accepting_subscribers ? "Yes" : "No"}
                 </td>

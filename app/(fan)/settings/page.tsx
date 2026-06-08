@@ -13,7 +13,9 @@ import {
   CreatorStudioLinks,
 } from "@/components/creator/become-creator-card";
 import { AppearanceSection } from "@/components/settings/appearance-section";
+import { DeleteAccountSection } from "@/components/settings/delete-account-section";
 import { UpdateProfileForm } from "@/components/settings/update-profile-form";
+import { getAccountDeletionStatus } from "@/lib/account/queries";
 import { requireAuth } from "@/lib/auth/get-auth-context";
 import { ROLE_LABELS } from "@/lib/auth/rbac";
 import { createClient } from "@/lib/supabase/server";
@@ -22,13 +24,16 @@ export default async function FanSettingsPage() {
   const supabase = await createClient();
   const auth = await requireAuth(supabase);
 
-  const { data: sessions } = await supabase
-    .from("user_sessions")
-    .select("id, user_agent, ip_address, last_active_at, created_at")
-    .eq("user_id", auth.userId)
-    .is("revoked_at", null)
-    .order("last_active_at", { ascending: false })
-    .limit(20);
+  const [{ data: sessions }, deletionStatus] = await Promise.all([
+    supabase
+      .from("user_sessions")
+      .select("id, user_agent, ip_address, last_active_at, created_at")
+      .eq("user_id", auth.userId)
+      .is("revoked_at", null)
+      .order("last_active_at", { ascending: false })
+      .limit(20),
+    getAccountDeletionStatus(supabase, auth.userId),
+  ]);
 
   return (
     <div className="space-y-12">
@@ -118,6 +123,21 @@ export default async function FanSettingsPage() {
           </p>
         </div>
         <SessionsManager sessions={(sessions ?? []) as SessionRow[]} />
+      </section>
+
+      {/* Danger zone */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-destructive">Danger zone</h2>
+          <p className="text-sm text-muted-foreground">
+            Permanently delete your account and personal data.
+          </p>
+        </div>
+        <DeleteAccountSection
+          username={auth.profile.username}
+          isCreator={auth.profile.role === "creator"}
+          scheduledFor={deletionStatus?.deletion_scheduled_for ?? null}
+        />
       </section>
     </div>
   );

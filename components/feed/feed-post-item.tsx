@@ -11,9 +11,11 @@ import type { PostRow } from "@/types/posts";
 export function FeedPostItem({
   post,
   viewerId,
+  watermarkLabel,
 }: {
   post: PostRow;
   viewerId?: string | null;
+  watermarkLabel?: string | null;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState<PostCommentRow[] | null>(null);
@@ -55,6 +57,7 @@ export function FeedPostItem({
     <div className="space-y-2">
       <PostCard
         post={post}
+        watermarkLabel={watermarkLabel}
         showComments={
           commentsOpen && post.can_view_full ? (
             <div className="space-y-2">

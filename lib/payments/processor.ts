@@ -123,6 +123,8 @@ export async function fulfillSubscriptionPayment(
         ? authorization.authorization_code
         : undefined,
     amountKobo: amount,
+    bundleMonths: meta.bundle_months,
+    giftId: meta.gift_id,
   });
 
   const { data: updated } = await admin
@@ -222,6 +224,18 @@ export async function failSubscriptionPayment(
     .eq("status", "pending");
 
   if (error) return;
+
+  const giftId =
+    typeof payment.metadata?.gift_id === "string"
+      ? payment.metadata.gift_id
+      : undefined;
+  if (giftId) {
+    await admin
+      .from("subscription_gifts")
+      .update({ status: "failed" })
+      .eq("id", giftId)
+      .eq("status", "pending");
+  }
 
   await writeAuditLog(admin, {
     actorId: payment.payer_id,

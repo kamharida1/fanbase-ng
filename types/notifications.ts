@@ -5,7 +5,17 @@ export type NotificationType =
   | "new_like"
   | "new_payout"
   | "creator_live"
-  | "new_tip";
+  | "new_tip"
+  | "new_post"
+  | "payment_dispute"
+  | "account_status"
+  | "appeal_update"
+  | "payment_failed"
+  | "subscription_ended"
+  | "resubscribe_reminder"
+  | "account_deletion"
+  | "gift_subscription"
+  | "missed_call";
 
 export type NotificationStatus = "pending" | "sent" | "failed" | "read";
 
@@ -32,6 +42,7 @@ export type NotificationPreferences = {
   push_enabled: boolean;
   sms_enabled: boolean;
   marketing_enabled: boolean;
+  digest_enabled: boolean;
   preferences: Record<NotificationType, boolean> & Record<string, unknown>;
   updated_at: string;
 };

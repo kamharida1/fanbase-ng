@@ -23,6 +23,8 @@ export async function initializeSubscriptionCheckout(input: {
     creator_id: string;
     billing_interval: PlanBillingInterval;
     purpose: "subscription_checkout";
+    bundle_months?: number;
+    gift_id?: string;
   };
 }): Promise<InitializeData> {
   return initializePaymentCheckout(input);

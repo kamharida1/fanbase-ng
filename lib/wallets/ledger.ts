@@ -84,3 +84,71 @@ export async function reverseCreatorPaymentCredit(
 
   return Boolean(data);
 }
+
+export async function holdCreatorPaymentForDispute(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    paymentId: string;
+    disputeId: string;
+    idempotencyKey: string;
+  },
+): Promise<boolean> {
+  const { data, error } = await admin.rpc("hold_creator_payment_for_dispute", {
+    p_creator_id: input.creatorId,
+    p_payment_id: input.paymentId,
+    p_dispute_id: input.disputeId,
+    p_idempotency_key: input.idempotencyKey,
+  });
+
+  if (error) {
+    console.error("[wallet dispute hold]", error.message);
+    return false;
+  }
+
+  return Boolean(data);
+}
+
+export async function releaseDisputeHold(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    disputeId: string;
+    idempotencyKey: string;
+  },
+): Promise<boolean> {
+  const { data, error } = await admin.rpc("release_dispute_hold", {
+    p_creator_id: input.creatorId,
+    p_dispute_id: input.disputeId,
+    p_idempotency_key: input.idempotencyKey,
+  });
+
+  if (error) {
+    console.error("[wallet dispute release]", error.message);
+    return false;
+  }
+
+  return Boolean(data);
+}
+
+export async function finalizeDisputeLoss(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    disputeId: string;
+    idempotencyKey: string;
+  },
+): Promise<boolean> {
+  const { data, error } = await admin.rpc("finalize_dispute_loss", {
+    p_creator_id: input.creatorId,
+    p_dispute_id: input.disputeId,
+    p_idempotency_key: input.idempotencyKey,
+  });
+
+  if (error) {
+    console.error("[wallet dispute finalize]", error.message);
+    return false;
+  }
+
+  return Boolean(data);
+}

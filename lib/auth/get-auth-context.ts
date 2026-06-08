@@ -62,6 +62,9 @@ export async function requireAuth(
   if (ctx.profile.status === "banned" || ctx.profile.status === "suspended") {
     redirect("/login?error=account_disabled");
   }
+  if (ctx.profile.status === "deleted") {
+    redirect("/login?error=account_deleted");
+  }
   return ctx;
 }
 

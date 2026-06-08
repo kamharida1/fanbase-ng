@@ -9,6 +9,67 @@ export type ModerationResult =
   | { success: true }
   | { success: false; error: string };
 
+export async function pinPost(postId: string): Promise<ModerationResult> {
+  const supabase = await createClient();
+  const auth = await requireAuth(supabase);
+
+  // Verify ownership
+  const { data: post } = await supabase
+    .from("posts")
+    .select("creator_id")
+    .eq("id", postId)
+    .eq("status", "published")
+    .maybeSingle();
+
+  if (!post || post.creator_id !== auth.userId) {
+    return { success: false, error: "Post not found or forbidden." };
+  }
+
+  // Unpin any currently pinned post for this creator
+  await supabase
+    .from("posts")
+    .update({ is_pinned: false })
+    .eq("creator_id", auth.userId)
+    .eq("is_pinned", true);
+
+  const { error } = await supabase
+    .from("posts")
+    .update({ is_pinned: true })
+    .eq("id", postId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath(`/creators/${auth.profile.username}`);
+  revalidatePath("/creator/content");
+  return { success: true };
+}
+
+export async function unpinPost(postId: string): Promise<ModerationResult> {
+  const supabase = await createClient();
+  const auth = await requireAuth(supabase);
+
+  const { data: post } = await supabase
+    .from("posts")
+    .select("creator_id")
+    .eq("id", postId)
+    .maybeSingle();
+
+  if (!post || post.creator_id !== auth.userId) {
+    return { success: false, error: "Post not found or forbidden." };
+  }
+
+  const { error } = await supabase
+    .from("posts")
+    .update({ is_pinned: false })
+    .eq("id", postId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath(`/creators/${auth.profile.username}`);
+  revalidatePath("/creator/content");
+  return { success: true };
+}
+
 export async function deleteComment(
   commentId: string,
 ): Promise<ModerationResult> {
@@ -78,6 +139,66 @@ export async function pinComment(
     .update({ is_pinned: true })
     .eq("id", commentId)
     .eq("post_id", postId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/feed");
+  return { success: true };
+}
+
+export async function hideComment(
+  commentId: string,
+): Promise<ModerationResult> {
+  const supabase = await createClient();
+  const auth = await requireAuth(supabase);
+
+  const { data: comment } = await supabase
+    .from("post_comments")
+    .select("post_id, posts!inner(creator_id)")
+    .eq("id", commentId)
+    .maybeSingle();
+
+  const postsVal = comment?.posts as unknown as { creator_id: string } | { creator_id: string }[] | null;
+  const creatorId = Array.isArray(postsVal) ? postsVal[0]?.creator_id : postsVal?.creator_id;
+
+  if (!comment || creatorId !== auth.userId) {
+    return { success: false, error: "Forbidden." };
+  }
+
+  const { error } = await supabase
+    .from("post_comments")
+    .update({ is_hidden_by_creator: true })
+    .eq("id", commentId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/feed");
+  return { success: true };
+}
+
+export async function unhideComment(
+  commentId: string,
+): Promise<ModerationResult> {
+  const supabase = await createClient();
+  const auth = await requireAuth(supabase);
+
+  const { data: comment } = await supabase
+    .from("post_comments")
+    .select("post_id, posts!inner(creator_id)")
+    .eq("id", commentId)
+    .maybeSingle();
+
+  const postsVal = comment?.posts as unknown as { creator_id: string } | { creator_id: string }[] | null;
+  const creatorId = Array.isArray(postsVal) ? postsVal[0]?.creator_id : postsVal?.creator_id;
+
+  if (!comment || creatorId !== auth.userId) {
+    return { success: false, error: "Forbidden." };
+  }
+
+  const { error } = await supabase
+    .from("post_comments")
+    .update({ is_hidden_by_creator: false })
+    .eq("id", commentId);
 
   if (error) return { success: false, error: error.message };
 

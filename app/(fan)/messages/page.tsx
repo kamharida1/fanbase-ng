@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { MessagingInbox } from "@/components/messaging/messaging-inbox";
 import { StartConversationForm } from "@/components/messaging/start-conversation-form";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
+import { buildWatermarkLabel } from "@/lib/media/watermark";
 import {
   getConversation,
   listConversations,
@@ -19,6 +20,11 @@ export default async function FanMessagesPage({ searchParams }: PageProps) {
   const supabase = await createClient();
   const auth = await getAuthContext(supabase);
   if (!auth) redirect("/login?next=/messages");
+
+  const watermarkLabel = buildWatermarkLabel({
+    username: auth.profile.username,
+    userId: auth.userId,
+  });
 
   const params = await searchParams;
   const inbox = await listConversations(supabase, auth.userId, "fan", "inbox");
@@ -64,6 +70,9 @@ export default async function FanMessagesPage({ searchParams }: PageProps) {
           currentUserId={auth.userId}
           role="fan"
           requestCount={0}
+          watermarkLabel={watermarkLabel}
+          callerUsername={auth.profile.username}
+          callerDisplayName={auth.profile.display_name}
         />
       </Suspense>
     </div>

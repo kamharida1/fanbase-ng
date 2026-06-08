@@ -94,6 +94,15 @@ export async function middleware(request: NextRequest) {
       );
     }
 
+    if (auth.profile.status === "deleted") {
+      return withRequestId(
+        NextResponse.redirect(
+          new URL("/login?error=account_deleted", request.url),
+        ),
+        requestId,
+      );
+    }
+
     if (!canAccessPath(pathname, auth.appRole)) {
       return withRequestId(
         NextResponse.redirect(

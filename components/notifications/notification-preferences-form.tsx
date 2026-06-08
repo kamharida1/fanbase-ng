@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { updateNotificationPreferencesAction } from "@/lib/notifications/actions";
 import { NOTIFICATION_TYPE_LABELS, NOTIFICATION_TYPES } from "@/lib/notifications/constants";
+import { disablePushNotifications, enablePushNotifications } from "@/lib/push/register";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -19,9 +20,25 @@ export function NotificationPreferencesForm({
   const [pushEnabled, setPushEnabled] = useState(initial.push_enabled);
   const [smsEnabled, setSmsEnabled] = useState(initial.sms_enabled);
   const [marketingEnabled, setMarketingEnabled] = useState(initial.marketing_enabled);
+  const [digestEnabled, setDigestEnabled] = useState(initial.digest_enabled);
+  const [pushBusy, setPushBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function handlePushToggle(on: boolean) {
+    setError(null);
+    setPushBusy(true);
+
+    const result = on ? await enablePushNotifications() : await disablePushNotifications();
+
+    setPushBusy(false);
+    if (!result.success) {
+      setError(result.error ?? "Could not update push notifications.");
+      return;
+    }
+    setPushEnabled(on);
+  }
 
   async function handleSave() {
     setLoading(true);
@@ -33,6 +50,7 @@ export function NotificationPreferencesForm({
       pushEnabled,
       smsEnabled,
       marketingEnabled,
+      digestEnabled,
       ...prefs,
     });
 
@@ -79,7 +97,8 @@ export function NotificationPreferencesForm({
           <Switch
             id="push-enabled"
             checked={pushEnabled}
-            onCheckedChange={setPushEnabled}
+            disabled={pushBusy}
+            onCheckedChange={(on) => void handlePushToggle(on)}
           />
         </div>
         <div className="flex items-center justify-between gap-4 text-sm">
@@ -96,6 +115,14 @@ export function NotificationPreferencesForm({
             id="marketing-enabled"
             checked={marketingEnabled}
             onCheckedChange={setMarketingEnabled}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-4 text-sm">
+          <Label htmlFor="digest-enabled">Weekly email digest</Label>
+          <Switch
+            id="digest-enabled"
+            checked={digestEnabled}
+            onCheckedChange={setDigestEnabled}
           />
         </div>
       </div>

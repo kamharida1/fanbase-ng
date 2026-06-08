@@ -10,6 +10,9 @@ export const adminCreatorUpdateSchema = z.object({
   isVerified: z.boolean().optional(),
   isAcceptingSubscribers: z.boolean().optional(),
   feedPriority: z.number().int().min(0).max(100).optional(),
+  approveVerification: z.boolean().optional(),
+  rejectVerification: z.boolean().optional(),
+  rejectionReason: z.string().max(300).optional(),
 });
 
 export const adminModeratePostSchema = z.object({
@@ -28,6 +31,18 @@ export const adminPayoutReviewSchema = z.object({
   requestId: z.string().uuid(),
   action: z.enum(["approve", "reject"]),
   reason: z.string().max(500).optional(),
+});
+
+export const adminResolveDisputeSchema = z.object({
+  disputeId: z.string().uuid(),
+  outcome: z.enum(["won", "lost", "closed"]),
+  notes: z.string().max(1000).optional(),
+});
+
+export const adminResolveAppealSchema = z.object({
+  appealId: z.string().uuid(),
+  outcome: z.enum(["approved", "denied"]),
+  notes: z.string().max(1000).optional(),
 });
 
 export const adminListQuerySchema = z.object({

@@ -2,12 +2,16 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolvePostMediaUrl } from "@/lib/media/resolve-url";
 import type {
+  PollOption,
   PostAuthor,
   PostCommentRow,
   PostMediaRow,
+  PostPoll,
   PostRow,
   PostStats,
+  TrendingHashtag,
 } from "@/types/posts";
+import { normalizeHashtag } from "@/lib/posts/hashtags";
 
 type PostMediaRecord = {
   id: string;
@@ -84,6 +88,78 @@ async function loadCanViewMap(
   return map;
 }
 
+async function loadPollsByPost(
+  supabase: SupabaseClient,
+  postIds: string[],
+  viewerId: string | null,
+): Promise<Map<string, PostPoll>> {
+  const map = new Map<string, PostPoll>();
+  if (postIds.length === 0) return map;
+
+  const { data: polls } = await supabase
+    .from("post_polls")
+    .select("id, post_id, question, closes_at")
+    .in("post_id", postIds);
+
+  if (!polls || polls.length === 0) return map;
+
+  const pollIds = polls.map((p) => p.id as string);
+
+  const [{ data: options }, { data: results }, { data: myVotes }] = await Promise.all([
+    supabase
+      .from("poll_options")
+      .select("id, poll_id, label, sort_order")
+      .in("poll_id", pollIds)
+      .order("sort_order", { ascending: true }),
+    supabase.rpc("get_poll_results", { p_poll_ids: pollIds }),
+    viewerId
+      ? supabase
+          .from("poll_votes")
+          .select("poll_id, option_id")
+          .eq("voter_id", viewerId)
+          .in("poll_id", pollIds)
+      : Promise.resolve({ data: [] as { poll_id: string; option_id: string }[] }),
+  ]);
+
+  const countByOption = new Map<string, number>();
+  for (const row of (results ?? []) as { option_id: string; vote_count: number }[]) {
+    countByOption.set(row.option_id, Number(row.vote_count));
+  }
+
+  const myVoteByPoll = new Map<string, string>();
+  for (const vote of (myVotes ?? []) as { poll_id: string; option_id: string }[]) {
+    myVoteByPoll.set(vote.poll_id, vote.option_id);
+  }
+
+  const optionsByPoll = new Map<string, PollOption[]>();
+  for (const row of (options ?? []) as { id: string; poll_id: string; label: string; sort_order: number }[]) {
+    const list = optionsByPoll.get(row.poll_id) ?? [];
+    list.push({
+      id: row.id,
+      label: row.label,
+      sort_order: row.sort_order,
+      vote_count: countByOption.get(row.id) ?? 0,
+    });
+    optionsByPoll.set(row.poll_id, list);
+  }
+
+  for (const poll of polls) {
+    const pollId = poll.id as string;
+    const options = optionsByPoll.get(pollId) ?? [];
+    map.set(poll.post_id as string, {
+      id: pollId,
+      post_id: poll.post_id as string,
+      question: poll.question as string,
+      closes_at: poll.closes_at as string | null,
+      options,
+      total_votes: options.reduce((sum, o) => sum + o.vote_count, 0),
+      my_vote_option_id: myVoteByPoll.get(pollId) ?? null,
+    });
+  }
+
+  return map;
+}
+
 async function loadPostMediaByPost(
   supabase: SupabaseClient,
   postIds: string[],
@@ -155,10 +231,11 @@ export async function enrichPosts(
   const postIds = posts.map((p) => p.id as string);
   const creatorIds = posts.map((p) => p.creator_id as string);
 
-  const [authors, canViewMap, mediaByPost, likedSet] = await Promise.all([
+  const [authors, canViewMap, mediaByPost, pollsByPost, likedSet] = await Promise.all([
     loadAuthors(supabase, creatorIds),
     loadCanViewMap(supabase, viewerId, postIds),
     loadPostMediaByPost(supabase, postIds),
+    loadPollsByPost(supabase, postIds, viewerId),
     (async () => {
       const set = new Set<string>();
       if (!viewerId) return set;
@@ -197,6 +274,7 @@ export async function enrichPosts(
       creator_id: creatorId,
       type: post.type as PostRow["type"],
       caption: post.caption as string | null,
+      content_warning: post.content_warning as string | null,
       visibility: post.visibility as PostRow["visibility"],
       plan_id: post.plan_id as string | null,
       ppv_price_kobo: post.ppv_price_kobo as number | null,
@@ -207,6 +285,8 @@ export async function enrichPosts(
       created_at: post.created_at as string,
       updated_at: post.updated_at as string,
       stats_cache: stats,
+      is_pinned: Boolean(post.is_pinned),
+      poll: pollsByPost.get(id) ?? null,
       author: authors.get(creatorId),
       media: resolvedMedia.get(id) ?? [],
       liked_by_me: likedSet.has(id),
@@ -254,12 +334,82 @@ export async function listCreatorPublishedPosts(
     .eq("creator_id", creatorId)
     .eq("status", "published")
     .is("removed_at", null)
+    .order("is_pinned", { ascending: false })
     .order("published_at", { ascending: false })
     .limit(limit);
 
   if (error || !data) return [];
 
   return enrichPosts(supabase, data, viewerId);
+}
+
+export async function searchPosts(
+  supabase: SupabaseClient,
+  input: {
+    query?: string;
+    hashtag?: string;
+    viewerId: string | null;
+    limit?: number;
+  },
+): Promise<PostRow[]> {
+  const trimmedQuery = input.query?.trim();
+  const hashtag = input.hashtag ? normalizeHashtag(input.hashtag) : undefined;
+  if (!trimmedQuery && !hashtag) return [];
+
+  let q = supabase
+    .from("posts")
+    .select("*")
+    .eq("status", "published")
+    .is("removed_at", null)
+    .eq("moderation_status", "approved")
+    .order("published_at", { ascending: false })
+    .limit(input.limit ?? 20);
+
+  if (trimmedQuery) {
+    q = q.textSearch("search_vector", trimmedQuery, {
+      type: "websearch",
+      config: "simple",
+    });
+  }
+  if (hashtag) {
+    q = q.contains("hashtags", [hashtag]);
+  }
+
+  const { data, error } = await q;
+  if (error || !data) return [];
+
+  return enrichPosts(supabase, data, input.viewerId);
+}
+
+export async function listTrendingPosts(
+  supabase: SupabaseClient,
+  viewerId: string | null,
+  limit = 20,
+): Promise<PostRow[]> {
+  const { data, error } = await supabase.rpc("get_trending_posts", {
+    p_fan_id: viewerId,
+    p_limit: limit,
+  });
+
+  if (error || !data) return [];
+
+  return enrichPosts(supabase, data as Record<string, unknown>[], viewerId);
+}
+
+export async function listTrendingHashtags(
+  supabase: SupabaseClient,
+  limit = 10,
+): Promise<TrendingHashtag[]> {
+  const { data, error } = await supabase.rpc("get_trending_hashtags", {
+    p_limit: limit,
+  });
+
+  if (error || !data) return [];
+
+  return (data as { hashtag: string; post_count: number }[]).map((row) => ({
+    hashtag: row.hashtag,
+    post_count: Number(row.post_count),
+  }));
 }
 
 /** @deprecated Use getHomeFeedPage from lib/feed/queries */
@@ -295,15 +445,21 @@ export async function getPostById(
 export async function listPostComments(
   supabase: SupabaseClient,
   postId: string,
+  { includeHidden = false }: { includeHidden?: boolean } = {},
 ): Promise<PostCommentRow[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("post_comments")
-    .select("id, post_id, author_id, body, parent_id, created_at, is_pinned")
+    .select("id, post_id, author_id, body, parent_id, created_at, is_pinned, is_hidden_by_creator")
     .eq("post_id", postId)
     .eq("is_deleted", false)
-    .eq("is_hidden_by_creator", false)
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: true });
+
+  if (!includeHidden) {
+    query = query.eq("is_hidden_by_creator", false);
+  }
+
+  const { data, error } = await query;
 
   if (error || !data) return [];
 

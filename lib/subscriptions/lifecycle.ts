@@ -44,18 +44,21 @@ export async function activateSubscription(
     paystackSubscriptionCode?: string | null;
     paystackCustomerCode?: string | null;
     renewExistingId?: string;
+    periodOverride?: { start: Date; end: Date };
+    cancelAtPeriodEnd?: boolean;
   },
 ): Promise<{ subscriptionId: string }> {
   const now = new Date();
   const trialDays =
-    input.plan.billing_interval !== "free" ? input.plan.trial_days : 0;
-  const { start, end } = addPeriod(
-    now,
-    input.plan.billing_interval,
-    trialDays,
-  );
+    input.plan.billing_interval !== "free" && !input.periodOverride
+      ? input.plan.trial_days
+      : 0;
+  const { start, end } =
+    input.periodOverride ??
+    addPeriod(now, input.plan.billing_interval, trialDays);
 
   const status = trialDays > 0 ? "trialing" : "active";
+  const cancelAtPeriodEnd = input.cancelAtPeriodEnd ?? false;
 
   const payload = {
     fan_id: input.fanId,
@@ -65,7 +68,7 @@ export async function activateSubscription(
     status,
     current_period_start: start.toISOString(),
     current_period_end: end.toISOString(),
-    cancel_at_period_end: false,
+    cancel_at_period_end: cancelAtPeriodEnd,
     cancelled_at: null,
     ended_at: null,
     paystack_subscription_code: input.paystackSubscriptionCode ?? null,
@@ -81,7 +84,7 @@ export async function activateSubscription(
         status: "active",
         current_period_start: start.toISOString(),
         current_period_end: end.toISOString(),
-        cancel_at_period_end: false,
+        cancel_at_period_end: cancelAtPeriodEnd,
         cancelled_at: null,
         ended_at: null,
         paystack_subscription_code:
@@ -219,6 +222,74 @@ export async function cancelSubscriptionAtPeriodEnd(
   await logSubscriptionEvent(supabase, subscriptionId, "cancel_scheduled", {});
 }
 
+export async function pauseSubscription(
+  supabase: SupabaseClient,
+  subscriptionId: string,
+  fanId: string,
+): Promise<void> {
+  const { data: sub, error: fetchError } = await supabase
+    .from("subscriptions")
+    .select("id, fan_id, status, current_period_end")
+    .eq("id", subscriptionId)
+    .eq("fan_id", fanId)
+    .single();
+
+  if (fetchError || !sub) throw new Error("Subscription not found.");
+  if (!["trialing", "active"].includes(sub.status)) {
+    throw new Error("Only active or trialing subscriptions can be paused.");
+  }
+
+  const { error } = await supabase
+    .from("subscriptions")
+    .update({ status: "paused", paused_at: new Date().toISOString() })
+    .eq("id", subscriptionId);
+
+  if (error) throw new Error(error.message);
+  await logSubscriptionEvent(supabase, subscriptionId, "paused" as never, {});
+}
+
+export async function resumeSubscription(
+  supabase: SupabaseClient,
+  subscriptionId: string,
+  fanId: string,
+): Promise<void> {
+  const { data: sub, error: fetchError } = await supabase
+    .from("subscriptions")
+    .select("id, fan_id, status, current_period_end")
+    .eq("id", subscriptionId)
+    .eq("fan_id", fanId)
+    .single();
+
+  if (fetchError || !sub) throw new Error("Subscription not found.");
+  if (sub.status !== "paused") {
+    throw new Error("Subscription is not paused.");
+  }
+
+  // If the period has already ended, set to expired instead
+  const periodEnd = sub.current_period_end
+    ? new Date(sub.current_period_end)
+    : null;
+  if (periodEnd && periodEnd.getTime() < Date.now()) {
+    const { error } = await supabase
+      .from("subscriptions")
+      .update({ status: "expired", ended_at: new Date().toISOString(), paused_at: null })
+      .eq("id", subscriptionId);
+    if (error) throw new Error(error.message);
+    await logSubscriptionEvent(supabase, subscriptionId, "expired" as never, {
+      reason: "resumed_after_period_end",
+    });
+    return;
+  }
+
+  const { error } = await supabase
+    .from("subscriptions")
+    .update({ status: "active", paused_at: null })
+    .eq("id", subscriptionId);
+
+  if (error) throw new Error(error.message);
+  await logSubscriptionEvent(supabase, subscriptionId, "resumed" as never, {});
+}
+
 export async function expireEndedSubscriptions(
   supabase: SupabaseClient,
 ): Promise<{ expired: number; pastDue: number }> {
@@ -269,7 +340,7 @@ export async function expireEndedSubscriptions(
 
   const { data: graceRows } = await supabase
     .from("subscriptions")
-    .select("id, current_period_end")
+    .select("id, fan_id, creator_id, current_period_end, subscription_plans (name)")
     .eq("status", "past_due");
 
   for (const row of graceRows ?? []) {
@@ -290,6 +361,27 @@ export async function expireEndedSubscriptions(
       await logSubscriptionEvent(supabase, row.id, "expired", {
         reason: "past_due_grace_elapsed",
       });
+
+      try {
+        const planRaw = row.subscription_plans as
+          | { name: string }
+          | { name: string }[]
+          | null;
+        const planName = Array.isArray(planRaw) ? planRaw[0]?.name : planRaw?.name;
+        const { createAdminClient } = await import("@/lib/supabase/admin");
+        const { notifySubscriptionEndedFromNonPayment } = await import(
+          "@/lib/notifications/emit"
+        );
+        const admin = createAdminClient();
+        await notifySubscriptionEndedFromNonPayment(admin, {
+          fanId: row.fan_id,
+          creatorId: row.creator_id,
+          subscriptionId: row.id,
+          planName: planName ?? "your plan",
+        });
+      } catch (err) {
+        console.error("[notifications] subscription ended (non-payment)", err);
+      }
     }
   }
 

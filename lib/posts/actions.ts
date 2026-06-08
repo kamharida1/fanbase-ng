@@ -1,13 +1,16 @@
 "use server";
 
 import { revalidatePath, revalidateTag } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireAuth } from "@/lib/auth/get-auth-context";
+import { extractHashtags } from "@/lib/posts/hashtags";
 import {
   commentSchema,
   likePostSchema,
   ngnToKobo,
   upsertPostSchema,
+  votePollSchema,
 } from "@/lib/posts/schemas";
 import { uploadPostMediaFile } from "@/lib/posts/storage";
 import { feedCacheTag } from "@/lib/feed/queries";
@@ -16,6 +19,40 @@ import { createClient } from "@/lib/supabase/server";
 export type ActionResult<T = void> =
   | { success: true; data?: T }
   | { success: false; error: string };
+
+async function attachPollIfMissing(
+  supabase: SupabaseClient,
+  postId: string,
+  poll: { question: string; options: string[]; closesInHours?: number } | null | undefined,
+) {
+  if (!poll) return;
+
+  const { data: existing } = await supabase
+    .from("post_polls")
+    .select("id")
+    .eq("post_id", postId)
+    .maybeSingle();
+  if (existing) return;
+
+  const closesAt = poll.closesInHours
+    ? new Date(Date.now() + poll.closesInHours * 60 * 60 * 1000).toISOString()
+    : null;
+
+  const { data: pollRow, error: pollError } = await supabase
+    .from("post_polls")
+    .insert({ post_id: postId, question: poll.question, closes_at: closesAt })
+    .select("id")
+    .single();
+  if (pollError || !pollRow) return;
+
+  await supabase.from("poll_options").insert(
+    poll.options.map((label, index) => ({
+      poll_id: pollRow.id,
+      label,
+      sort_order: index,
+    })),
+  );
+}
 
 function revalidatePostPaths(userId?: string) {
   revalidatePath("/creator/content");
@@ -69,6 +106,8 @@ export async function savePost(
     creator_id: auth.userId,
     type: parsed.data.type,
     caption: parsed.data.caption || null,
+    hashtags: extractHashtags(parsed.data.caption),
+    content_warning: parsed.data.contentWarning || null,
     visibility: parsed.data.visibility,
     plan_id: parsed.data.visibility === "tier" ? parsed.data.planId : null,
     ppv_price_kobo: parsed.data.visibility === "ppv" ? ppvKobo : null,
@@ -86,6 +125,7 @@ export async function savePost(
       .eq("creator_id", auth.userId);
 
   if (error) return { success: false, error: error.message };
+  await attachPollIfMissing(supabase, parsed.data.postId, parsed.data.poll);
   revalidatePostPaths(auth.userId);
   return { success: true, data: { postId: parsed.data.postId } };
   }
@@ -98,6 +138,7 @@ export async function savePost(
 
   if (error) return { success: false, error: error.message };
 
+  await attachPollIfMissing(supabase, data.id, parsed.data.poll);
   revalidatePostPaths(auth.userId);
   return { success: true, data: { postId: data.id } };
 }
@@ -235,6 +276,34 @@ export async function togglePostLike(
 
   revalidatePostPaths(auth.userId);
   return { success: true, data: { liked: true } };
+}
+
+export async function votePoll(
+  input: unknown,
+): Promise<ActionResult<{ optionId: string }>> {
+  const parsed = votePollSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Invalid vote." };
+  }
+
+  const supabase = await createClient();
+  const auth = await requireAuth(supabase);
+
+  const { error } = await supabase.from("poll_votes").insert({
+    poll_id: parsed.data.pollId,
+    option_id: parsed.data.optionId,
+    voter_id: auth.userId,
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { success: false, error: "You've already voted on this poll." };
+    }
+    return { success: false, error: "Couldn't record your vote. The poll may be closed." };
+  }
+
+  revalidatePostPaths();
+  return { success: true, data: { optionId: parsed.data.optionId } };
 }
 
 export async function addPostComment(

@@ -1,4 +1,5 @@
 import { formatNgnFromKobo } from "@/lib/creators/format";
+import { MediaWatermark } from "@/components/posts/media-watermark";
 import type { MessageRow } from "@/types/messaging";
 
 function formatTime(iso: string): string {
@@ -11,9 +12,11 @@ function formatTime(iso: string): string {
 export function MessageBubble({
   message,
   isOwn,
+  watermarkLabel,
 }: {
   message: MessageRow;
   isOwn: boolean;
+  watermarkLabel?: string | null;
 }) {
   return (
     <div className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
@@ -25,12 +28,17 @@ export function MessageBubble({
         }
       >
         {message.attachment_url && message.attachment_type === "image" ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={message.attachment_url}
-            alt={message.attachment_filename ?? "Attachment"}
-            className="mb-2 w-full max-h-64 rounded-lg object-cover"
-          />
+          <div className="relative mb-2 overflow-hidden rounded-lg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={message.attachment_url}
+              alt={message.attachment_filename ?? "Attachment"}
+              className="w-full max-h-64 rounded-lg object-cover"
+            />
+            {!isOwn && watermarkLabel ? (
+              <MediaWatermark label={watermarkLabel} />
+            ) : null}
+          </div>
         ) : null}
 
         {message.attachment_url && message.attachment_type !== "image" ? (

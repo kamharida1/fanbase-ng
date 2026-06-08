@@ -8,10 +8,17 @@ import {
   adminCreatorUpdateSchema,
   adminModeratePostSchema,
   adminPayoutReviewSchema,
+  adminResolveAppealSchema,
+  adminResolveDisputeSchema,
   adminResolveReportSchema,
   adminUserStatusSchema,
 } from "@/lib/admin/schemas";
 import { requireAdminStaff } from "@/lib/admin/require";
+import {
+  notifyAccountStatusChange,
+  notifyAppealResolved,
+} from "@/lib/notifications/emit";
+import { resolveDispute } from "@/lib/payments/disputes";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type AdminActionResult =
@@ -26,6 +33,8 @@ function revalidateAdmin() {
   revalidatePath("/admin/reports");
   revalidatePath("/admin/finance");
   revalidatePath("/admin/payouts");
+  revalidatePath("/admin/disputes");
+  revalidatePath("/admin/appeals");
   revalidatePath("/admin/analytics");
   revalidatePath("/admin/audit");
 }
@@ -79,6 +88,17 @@ export async function adminUpdateUserStatus(
       afterState: { status: parsed.data.status },
     });
 
+    if (
+      parsed.data.status === "suspended" ||
+      parsed.data.status === "banned" ||
+      parsed.data.status === "active"
+    ) {
+      void notifyAccountStatusChange(admin, {
+        userId: parsed.data.userId,
+        status: parsed.data.status,
+      }).catch((err) => console.error("[notify:account_status]", err));
+    }
+
     revalidateAdmin();
     return { success: true };
   } catch (err) {
@@ -101,27 +121,49 @@ export async function adminUpdateCreator(
     const ctx = await requireAdminStaff("admin");
     const admin = createAdminClient();
 
-    const payload: Record<string, unknown> = {};
+    const creatorPayload: Record<string, unknown> = {};
+    const profilePayload: Record<string, unknown> = {};
+
     if (parsed.data.isVerified !== undefined) {
-      payload.is_verified = parsed.data.isVerified;
+      creatorPayload.is_verified = parsed.data.isVerified;
     }
     if (parsed.data.isAcceptingSubscribers !== undefined) {
-      payload.is_accepting_subscribers = parsed.data.isAcceptingSubscribers;
+      creatorPayload.is_accepting_subscribers = parsed.data.isAcceptingSubscribers;
     }
     if (parsed.data.feedPriority !== undefined) {
-      payload.feed_priority = parsed.data.feedPriority;
+      creatorPayload.feed_priority = parsed.data.feedPriority;
+    }
+    if (parsed.data.approveVerification) {
+      creatorPayload.is_verified = true;
+      profilePayload.kyc_status = "verified";
+      profilePayload.verification_rejected_reason = null;
+    }
+    if (parsed.data.rejectVerification) {
+      profilePayload.kyc_status = "rejected";
+      profilePayload.verification_rejected_reason = parsed.data.rejectionReason ?? "Your request did not meet our verification criteria.";
     }
 
-    if (Object.keys(payload).length === 0) {
+    if (Object.keys(creatorPayload).length === 0 && Object.keys(profilePayload).length === 0) {
       return { success: false, error: "No changes provided." };
     }
 
-    const { error } = await admin
-      .from("creator_profiles")
-      .update(payload)
-      .eq("user_id", parsed.data.userId);
+    if (Object.keys(creatorPayload).length > 0) {
+      const { error } = await admin
+        .from("creator_profiles")
+        .update(creatorPayload)
+        .eq("user_id", parsed.data.userId);
+      if (error) return { success: false, error: error.message };
+    }
 
-    if (error) return { success: false, error: error.message };
+    if (Object.keys(profilePayload).length > 0) {
+      const { error } = await admin
+        .from("profiles")
+        .update(profilePayload)
+        .eq("id", parsed.data.userId);
+      if (error) return { success: false, error: error.message };
+    }
+
+    const payload = { ...creatorPayload, ...profilePayload };
 
     await logAdminAction(admin, {
       actorId: ctx.userId,
@@ -309,6 +351,153 @@ export async function adminReviewPayout(
     return {
       success: false,
       error: err instanceof Error ? err.message : "Payout review failed.",
+    };
+  }
+}
+
+export async function adminResolveDispute(
+  input: unknown,
+): Promise<AdminActionResult> {
+  const parsed = adminResolveDisputeSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Invalid input." };
+  }
+
+  try {
+    const ctx = await requireAdminStaff("admin");
+    assertStaffRole(ctx, "admin");
+    const admin = createAdminClient();
+    const adminUserId = await getAdminUserId(admin, ctx.userId);
+
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: "Your account is not linked to an admin_users record.",
+      };
+    }
+
+    const { data: dispute, error: fetchError } = await admin
+      .from("disputes")
+      .select("id, payment_id, creator_id, fan_id, status, amount_kobo")
+      .eq("id", parsed.data.disputeId)
+      .maybeSingle();
+
+    if (fetchError || !dispute) {
+      return { success: false, error: "Dispute not found." };
+    }
+
+    if (dispute.status !== "open") {
+      return { success: false, error: "This dispute has already been resolved." };
+    }
+
+    const { data: payment } = await admin
+      .from("payments")
+      .select("subscription_id")
+      .eq("id", dispute.payment_id)
+      .maybeSingle();
+
+    await resolveDispute(admin, {
+      disputeId: dispute.id,
+      paymentId: dispute.payment_id,
+      creatorId: dispute.creator_id,
+      fanId: dispute.fan_id,
+      subscriptionId: payment?.subscription_id ?? null,
+      amountKobo: dispute.amount_kobo,
+      outcome: parsed.data.outcome,
+      notes: parsed.data.notes ?? null,
+      resolvedBy: adminUserId,
+      source: "admin",
+    });
+
+    await logAdminAction(admin, {
+      actorId: ctx.userId,
+      action: "admin.dispute.resolved",
+      entityType: "disputes",
+      entityId: dispute.id,
+      afterState: { outcome: parsed.data.outcome },
+    });
+
+    revalidateAdmin();
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Dispute resolution failed.",
+    };
+  }
+}
+
+export async function adminResolveAppeal(
+  input: unknown,
+): Promise<AdminActionResult> {
+  const parsed = adminResolveAppealSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Invalid input." };
+  }
+
+  try {
+    const ctx = await requireAdminStaff("admin");
+    assertStaffRole(ctx, "admin");
+    const admin = createAdminClient();
+
+    const { data: appeal, error: fetchError } = await admin
+      .from("account_appeals")
+      .select("id, user_id, status")
+      .eq("id", parsed.data.appealId)
+      .maybeSingle();
+
+    if (fetchError || !appeal) {
+      return { success: false, error: "Appeal not found." };
+    }
+
+    if (appeal.status !== "pending") {
+      return { success: false, error: "This appeal has already been resolved." };
+    }
+
+    const { error: updateError } = await admin
+      .from("account_appeals")
+      .update({
+        status: parsed.data.outcome,
+        admin_notes: parsed.data.notes ?? null,
+        resolved_by: ctx.userId,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("id", appeal.id);
+
+    if (updateError) return { success: false, error: updateError.message };
+
+    if (parsed.data.outcome === "approved") {
+      const { error: reinstateError } = await admin
+        .from("profiles")
+        .update({ status: "active" })
+        .eq("id", appeal.user_id);
+
+      if (reinstateError) {
+        return { success: false, error: reinstateError.message };
+      }
+    }
+
+    await logAdminAction(admin, {
+      actorId: ctx.userId,
+      action: "admin.appeal.resolved",
+      entityType: "account_appeals",
+      entityId: appeal.id,
+      afterState: { outcome: parsed.data.outcome },
+    });
+
+    void notifyAppealResolved(admin, {
+      userId: appeal.user_id,
+      appealId: appeal.id,
+      outcome: parsed.data.outcome,
+      notes: parsed.data.notes ?? null,
+    }).catch((err) => console.error("[notify:appeal_update]", err));
+
+    revalidateAdmin();
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Appeal resolution failed.",
     };
   }
 }

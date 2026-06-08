@@ -31,6 +31,16 @@ export function addPeriod(
   return { start, end };
 }
 
+export function addBundlePeriod(
+  from: Date,
+  months: number,
+): { start: Date; end: Date } {
+  const start = new Date(from);
+  const end = new Date(start);
+  end.setUTCMonth(end.getUTCMonth() + months);
+  return { start, end };
+}
+
 export function extendPeriod(
   currentEnd: Date | null,
   interval: PlanBillingInterval,
@@ -47,3 +57,9 @@ export const PAST_DUE_GRACE_DAYS = 3;
 export function pastDueGraceEnds(periodEnd: Date): Date {
   return new Date(periodEnd.getTime() + PAST_DUE_GRACE_DAYS * MS_DAY);
 }
+
+// How long after a subscription ends before we send a "we miss you" reminder.
+export const WIN_BACK_DELAY_DAYS = 7;
+// Width of the lookback window the daily cron scans, so a missed run on day N
+// still catches the subscription on day N+1 (idempotency_key prevents repeats).
+export const WIN_BACK_WINDOW_DAYS = 3;

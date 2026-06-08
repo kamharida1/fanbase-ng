@@ -8,6 +8,7 @@ import {
   parseSubscriptionCreatePayload,
 } from "@/lib/paystack/parse";
 import type { PaystackWebhookBody } from "@/lib/paystack/types";
+import { processDisputeWebhook } from "@/lib/payments/disputes";
 import { fulfillPpvPurchase } from "@/lib/payments/ppv-processor";
 import {
   failSubscriptionPayment,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/payments/processor";
 import { processRefundWebhook } from "@/lib/payments/refunds";
 import { logSubscriptionEvent } from "@/lib/subscriptions/events";
+import { pastDueGraceEnds } from "@/lib/subscriptions/period";
 import type { PlanBillingInterval } from "@/types/subscription";
 
 export async function dispatchPaystackWebhook(
@@ -39,6 +41,12 @@ export async function dispatchPaystackWebhook(
     case "refund.processed":
     case "refund.failed":
       await processRefundWebhook(admin, { event, data, requestId });
+      return;
+
+    case "charge.dispute.create":
+    case "charge.dispute.remind":
+    case "charge.dispute.resolve":
+      await processDisputeWebhook(admin, { event, data, requestId });
       return;
 
     case "subscription.create":
@@ -238,7 +246,7 @@ async function handleInvoicePaymentFailed(
 
   const { data: sub } = await admin
     .from("subscriptions")
-    .select("id, fan_id")
+    .select("id, fan_id, creator_id, current_period_end, subscription_plans (name)")
     .eq("paystack_subscription_code", subCode)
     .maybeSingle();
 
@@ -262,6 +270,19 @@ async function handleInvoicePaymentFailed(
     requestId,
     metadata: { paystack_subscription_code: subCode },
   });
+
+  if (sub.current_period_end) {
+    const planRaw = sub.subscription_plans as { name: string } | { name: string }[] | null;
+    const planName = Array.isArray(planRaw) ? planRaw[0]?.name : planRaw?.name;
+    const { notifySubscriptionPastDue } = await import("@/lib/notifications/emit");
+    await notifySubscriptionPastDue(admin, {
+      fanId: sub.fan_id,
+      creatorId: sub.creator_id,
+      subscriptionId: sub.id,
+      planName: planName ?? "your plan",
+      graceEndsAt: pastDueGraceEnds(new Date(sub.current_period_end)),
+    }).catch((err) => console.error("[notify:payment_failed]", err));
+  }
 }
 
 async function handleSubscriptionDisabled(

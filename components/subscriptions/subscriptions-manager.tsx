@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { cancelFanSubscription } from "@/lib/subscriptions/actions";
+import {
+  cancelFanSubscription,
+  pauseFanSubscription,
+  resumeFanSubscription,
+} from "@/lib/subscriptions/actions";
 import { formatPlanPrice } from "@/lib/subscriptions/format";
 import { isSubscriptionAccessActive } from "@/lib/subscriptions/access";
 import { Button } from "@/components/ui/button";
@@ -31,10 +35,25 @@ export function SubscriptionsManager({
     setLoadingId(subscriptionId);
     const result = await cancelFanSubscription({ subscriptionId });
     setLoadingId(null);
-    if (!result.success) {
-      setError(result.error);
-      return;
-    }
+    if (!result.success) { setError(result.error); return; }
+    router.refresh();
+  }
+
+  async function handlePause(subscriptionId: string) {
+    setError(null);
+    setLoadingId(subscriptionId);
+    const result = await pauseFanSubscription({ subscriptionId });
+    setLoadingId(null);
+    if (!result.success) { setError(result.error); return; }
+    router.refresh();
+  }
+
+  async function handleResume(subscriptionId: string) {
+    setError(null);
+    setLoadingId(subscriptionId);
+    const result = await resumeFanSubscription({ subscriptionId });
+    setLoadingId(null);
+    if (!result.success) { setError(result.error); return; }
     router.refresh();
   }
 
@@ -76,16 +95,23 @@ export function SubscriptionsManager({
               </p>
               <p className="mt-1 text-sm">
                 Status:{" "}
-                <span className="font-medium capitalize">
-                  {sub.cancel_at_period_end && active
-                    ? "cancels at period end"
-                    : sub.status.replace("_", " ")}
+                <span className={`font-medium capitalize ${sub.status === "paused" ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                  {sub.status === "paused"
+                    ? "Paused"
+                    : sub.cancel_at_period_end && active
+                      ? "Cancels at period end"
+                      : sub.status.replace("_", " ")}
                 </span>
               </p>
               {sub.current_period_end ? (
                 <p className="text-sm text-muted-foreground">
                   {active ? "Renews / ends" : "Ended"}:{" "}
                   {formatDate(sub.current_period_end)}
+                </p>
+              ) : null}
+              {sub.status === "paused" && sub.paused_at ? (
+                <p className="text-xs text-muted-foreground">
+                  Paused {formatDate(sub.paused_at)}
                 </p>
               ) : null}
             </div>
@@ -95,15 +121,34 @@ export function SubscriptionsManager({
                   <Link href={`/creators/${sub.creator.username}`}>View profile</Link>
                 </Button>
               ) : null}
-              {active && !sub.cancel_at_period_end ? (
+              {sub.status === "paused" ? (
                 <Button
-                  variant="ghost"
                   size="sm"
                   disabled={loadingId === sub.id}
-                  onClick={() => handleCancel(sub.id)}
+                  onClick={() => handleResume(sub.id)}
                 >
-                  Cancel subscription
+                  Resume
                 </Button>
+              ) : null}
+              {active && !sub.cancel_at_period_end ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={loadingId === sub.id}
+                    onClick={() => handlePause(sub.id)}
+                  >
+                    Pause
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={loadingId === sub.id}
+                    onClick={() => handleCancel(sub.id)}
+                  >
+                    Cancel
+                  </Button>
+                </>
               ) : null}
             </div>
           </li>

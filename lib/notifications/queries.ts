@@ -84,6 +84,7 @@ export async function getNotificationPreferences(
     push_enabled: data?.push_enabled ?? true,
     sms_enabled: data?.sms_enabled ?? false,
     marketing_enabled: data?.marketing_enabled ?? false,
+    digest_enabled: data?.digest_enabled ?? true,
     preferences: typed,
     updated_at: data?.updated_at ?? new Date().toISOString(),
   };

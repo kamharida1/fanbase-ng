@@ -22,6 +22,10 @@ export async function requireApiAuth(
     return NextResponse.json({ error: "Account disabled" }, { status: 403 });
   }
 
+  if (ctx.profile.status === "deleted") {
+    return NextResponse.json({ error: "Account deleted" }, { status: 403 });
+  }
+
   if (!hasMinimumRole(ctx.appRole, minRole)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

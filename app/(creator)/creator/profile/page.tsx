@@ -1,4 +1,5 @@
 import { ProfileEditor } from "@/components/creator/profile-editor";
+import { VerificationRequestCard } from "@/components/creator/verification-request-card";
 import { normalizeSocialLinks } from "@/lib/creators/format";
 import { getCreatorStudioProfile } from "@/lib/creators/queries";
 import { requireRole } from "@/lib/auth/get-auth-context";
@@ -39,6 +40,14 @@ export default async function CreatorProfilePage() {
         avatarUrl={studio.profile?.avatar_url ?? null}
         creator={creatorRow}
       />
+
+      {!studio.creator?.is_verified && (
+        <VerificationRequestCard
+          kycStatus={(studio.profile?.kyc_status as "none" | "pending" | "verified" | "rejected") ?? "none"}
+          rejectedReason={studio.profile?.verification_rejected_reason ?? null}
+          existingNote={studio.profile?.verification_note ?? null}
+        />
+      )}
     </div>
   );
 }

@@ -15,6 +15,8 @@ export function SubscribeButton({
   isLoggedIn,
   loginNext,
   offerId,
+  bundleId,
+  label,
 }: {
   planId: string;
   planName: string;
@@ -23,6 +25,8 @@ export function SubscribeButton({
   isLoggedIn: boolean;
   loginNext: string;
   offerId?: string;
+  bundleId?: string;
+  label?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -61,7 +65,7 @@ export function SubscribeButton({
     setError(null);
     setLoading(true);
 
-    const result = await subscribeToPlan({ planId, offerId });
+    const result = await subscribeToPlan({ planId, offerId, bundleId });
     setLoading(false);
 
     if (!result.success) {
@@ -87,9 +91,11 @@ export function SubscribeButton({
       >
         {loading
           ? "Please wait…"
-          : isFree
-            ? `Join ${planName} (free)`
-            : `Subscribe to ${planName}`}
+          : label
+            ? label
+            : isFree
+              ? `Join ${planName} (free)`
+              : `Subscribe to ${planName}`}
       </Button>
       {error ? (
         <p className="mt-2 text-sm text-destructive" role="alert">

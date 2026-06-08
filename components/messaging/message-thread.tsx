@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CallButton } from "@/components/calls/call-button";
 import { MessageBubble } from "@/components/messaging/message-bubble";
 import { MessageComposer } from "@/components/messaging/message-composer";
 import { RequestActions } from "@/components/messaging/request-actions";
@@ -13,6 +14,7 @@ import {
   unsubscribeChannel,
 } from "@/lib/messaging/realtime";
 import { createClient } from "@/lib/supabase/client";
+import type { CallType } from "@/types/calls";
 import type { ConversationRow, MessageRow } from "@/types/messaging";
 
 export function MessageThread({
@@ -20,19 +22,20 @@ export function MessageThread({
   initialMessages,
   currentUserId,
   role,
+  watermarkLabel,
+  onStartCall,
 }: {
   conversation: ConversationRow;
   initialMessages: MessageRow[];
   currentUserId: string;
   role: "fan" | "creator";
+  watermarkLabel?: string | null;
+  onStartCall?: (callType: CallType) => void;
 }) {
   const router = useRouter();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState(initialMessages);
   const supabase = createClient();
-
-  const otherId =
-    role === "fan" ? conversation.creator_id : conversation.fan_id;
 
   const enrichMessage = useCallback(
     async (row: MessageRow): Promise<MessageRow> => {
@@ -97,14 +100,28 @@ export function MessageThread({
       ? "You can send one intro message while your request is pending."
       : undefined;
 
+  const canCall =
+    !!onStartCall &&
+    conversation.status === "accepted" &&
+    !conversation.is_blocked_by_creator &&
+    !conversation.is_blocked_by_fan;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="shrink-0 border-b px-4 py-3">
-        <p className="truncate font-semibold">{title}</p>
-        {other?.username ? (
-          <p className="truncate text-sm text-muted-foreground">
-            @{other.username}
-          </p>
+      <div className="shrink-0 flex items-center justify-between gap-2 border-b px-4 py-3">
+        <div className="min-w-0">
+          <p className="truncate font-semibold">{title}</p>
+          {other?.username ? (
+            <p className="truncate text-sm text-muted-foreground">
+              @{other.username}
+            </p>
+          ) : null}
+        </div>
+        {canCall ? (
+          <div className="flex shrink-0 gap-1">
+            <CallButton callType="voice" onClick={onStartCall!} />
+            <CallButton callType="video" onClick={onStartCall!} />
+          </div>
         ) : null}
       </div>
 
@@ -118,6 +135,7 @@ export function MessageThread({
             key={`${message.id}-${message.created_at}`}
             message={message}
             isOwn={message.sender_id === currentUserId}
+            watermarkLabel={watermarkLabel}
           />
         ))}
         <div ref={bottomRef} />

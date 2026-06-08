@@ -17,6 +17,7 @@ type RankedFeedRow = {
   creator_id: string;
   type: string;
   caption: string | null;
+  content_warning: string | null;
   visibility: string;
   plan_id: string | null;
   ppv_price_kobo: number | null;
@@ -77,6 +78,7 @@ async function buildFeedPage(
       creator_id: r.creator_id,
       type: r.type,
       caption: r.caption,
+      content_warning: r.content_warning,
       visibility: r.visibility,
       plan_id: r.plan_id,
       ppv_price_kobo: r.ppv_price_kobo,

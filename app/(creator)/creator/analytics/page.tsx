@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { BarChart } from "@/components/analytics/bar-chart";
 import { StatCard } from "@/components/analytics/stat-card";
+import { StoryAnalytics } from "@/components/analytics/story-analytics";
 import { TopPostsTable } from "@/components/analytics/top-posts-table";
 import { requireAuth } from "@/lib/auth/get-auth-context";
 import {
@@ -11,6 +12,7 @@ import {
   getTopPosts,
   formatNgnFromKobo,
 } from "@/lib/analytics/queries";
+import { getStoryAnalytics } from "@/lib/stories/queries";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -21,12 +23,13 @@ export default async function CreatorAnalyticsPage() {
 
   if (auth.profile.role !== "creator") redirect("/settings");
 
-  const [summary, subscriberGrowth, earningsByMonth, topPosts] =
+  const [summary, subscriberGrowth, earningsByMonth, topPosts, storyAnalytics] =
     await Promise.all([
       getAnalyticsSummary(supabase, auth.userId),
       getSubscriberGrowthByMonth(supabase, auth.userId, 6),
       getEarningsByMonth(supabase, auth.userId, 6),
       getTopPosts(supabase, auth.userId, 10),
+      getStoryAnalytics(supabase, auth.userId),
     ]);
 
   const maxSubscribers = Math.max(...subscriberGrowth.map((p) => p.value), 1);
@@ -163,6 +166,17 @@ export default async function CreatorAnalyticsPage() {
           </p>
         </div>
         <TopPostsTable posts={topPosts} />
+      </section>
+
+      {/* ── Story view analytics ───────────────────────────────────────── */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Story analytics</h2>
+          <p className="text-sm text-muted-foreground">
+            View counts and viewer list for your stories in the last 7 days
+          </p>
+        </div>
+        <StoryAnalytics stories={storyAnalytics} />
       </section>
     </div>
   );

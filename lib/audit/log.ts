@@ -16,7 +16,17 @@ export type AuditAction =
   | "subscription.cancel_scheduled"
   | "subscription.expired"
   | "subscription.revoked_refund"
+  | "subscription.revoked_dispute"
+  | "payment.dispute_opened"
+  | "payment.dispute_resolved"
+  | "wallet.dispute_held"
+  | "wallet.dispute_released"
+  | "wallet.dispute_debited"
+  | "admin.dispute.resolved"
+  | "appeal.submitted"
+  | "admin.appeal.resolved"
   | "paystack.webhook.received"
+  | "paystack.webhook.retry"
   | "paystack.webhook.duplicate"
   | "paystack.webhook.processed"
   | "paystack.webhook.failed"
@@ -34,7 +44,11 @@ export type AuditAction =
   | "admin.payout.reviewed"
   | "live.stream.started"
   | "live.stream.ended"
-  | "payment.tip_received";
+  | "payment.tip_received"
+  | "account.deletion_requested"
+  | "account.deletion_cancelled"
+  | "account.deletion_completed"
+  | "subscription.gift_initiated";
 
 export type WriteAuditLogInput = {
   actorId?: string | null;

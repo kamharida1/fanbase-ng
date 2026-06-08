@@ -2,15 +2,20 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { postgrestIlikePattern, sanitizePostgrestIlikeTerm } from "@/lib/security/postgrest-search";
 import type {
+  AdminAppealRow,
   AdminAuditRow,
+  AdminCreatorDebtRow,
   AdminCreatorRow,
   AdminDashboardStats,
+  AdminDisputeRow,
   AdminFinanceSummary,
   AdminModerationItem,
   AdminPayoutRow,
   AdminReportRow,
   AdminUserRow,
+  AdminWalletDetail,
 } from "@/types/admin";
+import type { WalletTransactionRow } from "@/types/wallet";
 
 export async function getAdminDashboardStats(
   admin: SupabaseClient,
@@ -94,7 +99,7 @@ export async function listAdminCreators(
       feed_priority,
       approved_at,
       created_at,
-      profiles!inner (username, display_name)
+      profiles!inner (username, display_name, kyc_status, verification_note, verification_rejected_reason)
     `,
       { count: "exact" },
     )
@@ -114,8 +119,8 @@ export async function listAdminCreators(
 
   const creators: AdminCreatorRow[] = data.map((row) => {
     const rawProfile = row.profiles as
-      | { username: string; display_name: string | null }
-      | { username: string; display_name: string | null }[];
+      | { username: string; display_name: string | null; kyc_status: string; verification_note: string | null; verification_rejected_reason: string | null }
+      | { username: string; display_name: string | null; kyc_status: string; verification_note: string | null; verification_rejected_reason: string | null }[];
     const profile = Array.isArray(rawProfile) ? rawProfile[0] : rawProfile;
     return {
       user_id: row.user_id,
@@ -126,6 +131,9 @@ export async function listAdminCreators(
       feed_priority: row.feed_priority ?? 0,
       approved_at: row.approved_at,
       created_at: row.created_at,
+      kyc_status: (profile.kyc_status ?? "none") as AdminCreatorRow["kyc_status"],
+      verification_note: profile.verification_note ?? null,
+      verification_rejected_reason: profile.verification_rejected_reason ?? null,
     };
   });
 
@@ -251,17 +259,139 @@ export async function listAdminPayouts(
   if (error || !data) return [];
 
   const creatorIds = [...new Set(data.map((p) => p.creator_id))];
+
+  const [{ data: profiles }, { data: wallets }, { data: disputes }] = await Promise.all([
+    admin.from("profiles").select("id, username").in("id", creatorIds),
+    admin
+      .from("wallets")
+      .select("owner_id, held_kobo, debt_kobo")
+      .eq("owner_type", "creator")
+      .in("owner_id", creatorIds),
+    admin
+      .from("disputes")
+      .select("creator_id")
+      .eq("status", "open")
+      .in("creator_id", creatorIds),
+  ]);
+
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p.username]));
+  const walletMap = new Map(
+    (wallets ?? []).map((w) => [w.owner_id, { held: w.held_kobo, debt: w.debt_kobo }]),
+  );
+  const disputeCounts = new Map<string, number>();
+  for (const d of disputes ?? []) {
+    if (!d.creator_id) continue;
+    disputeCounts.set(d.creator_id, (disputeCounts.get(d.creator_id) ?? 0) + 1);
+  }
+
+  return data.map((p) => {
+    const wallet = walletMap.get(p.creator_id);
+    return {
+      ...p,
+      creator_username: profileMap.get(p.creator_id) ?? null,
+      wallet_held_kobo: wallet?.held ?? 0,
+      wallet_debt_kobo: wallet?.debt ?? 0,
+      open_disputes_count: disputeCounts.get(p.creator_id) ?? 0,
+    };
+  });
+}
+
+export async function listAdminDisputes(
+  admin: SupabaseClient,
+  input: { status?: string[]; limit?: number },
+): Promise<AdminDisputeRow[]> {
+  let query = admin
+    .from("disputes")
+    .select(
+      "id, payment_id, creator_id, fan_id, status, amount_kobo, reason, evidence_due_at, resolution_notes, resolved_at, created_at, metadata",
+    )
+    .order("created_at", { ascending: false })
+    .limit(input.limit ?? 50);
+
+  if (input.status?.length) {
+    query = query.in("status", input.status);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) return [];
+
+  const userIds = [
+    ...new Set(
+      data.flatMap((d) => [d.creator_id, d.fan_id].filter(Boolean)),
+    ),
+  ] as string[];
+
   const { data: profiles } = await admin
     .from("profiles")
     .select("id, username")
-    .in("id", creatorIds);
+    .in("id", userIds);
 
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, p.username]));
 
-  return data.map((p) => ({
-    ...p,
-    creator_username: profileMap.get(p.creator_id) ?? null,
+  return data.map((d) => ({
+    id: d.id,
+    payment_id: d.payment_id,
+    creator_id: d.creator_id,
+    creator_username: d.creator_id ? profileMap.get(d.creator_id) ?? null : null,
+    fan_id: d.fan_id,
+    fan_username: d.fan_id ? profileMap.get(d.fan_id) ?? null : null,
+    status: d.status,
+    amount_kobo: d.amount_kobo,
+    reason: d.reason,
+    evidence_due_at: d.evidence_due_at,
+    resolution_notes: d.resolution_notes,
+    resolved_at: d.resolved_at,
+    created_at: d.created_at,
+    needs_manual_review: Boolean(
+      (d.metadata as Record<string, unknown> | null)?.needs_manual_review,
+    ),
   }));
+}
+
+export async function listAdminAppeals(
+  admin: SupabaseClient,
+  input: { status?: string[]; limit?: number } = {},
+): Promise<AdminAppealRow[]> {
+  let query = admin
+    .from("account_appeals")
+    .select(
+      "id, user_id, status, account_status_at_submission, message, admin_notes, resolved_at, created_at",
+    )
+    .order("created_at", { ascending: false })
+    .limit(input.limit ?? 50);
+
+  if (input.status?.length) {
+    query = query.in("status", input.status);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) return [];
+
+  const userIds = [...new Set(data.map((a) => a.user_id))];
+
+  const { data: profiles } = await admin
+    .from("profiles")
+    .select("id, username, display_name, status")
+    .in("id", userIds);
+
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+  return data.map((a) => {
+    const profile = profileMap.get(a.user_id);
+    return {
+      id: a.id,
+      user_id: a.user_id,
+      username: profile?.username ?? null,
+      display_name: profile?.display_name ?? null,
+      status: a.status,
+      account_status_at_submission: a.account_status_at_submission,
+      current_account_status: profile?.status ?? null,
+      message: a.message,
+      admin_notes: a.admin_notes,
+      resolved_at: a.resolved_at,
+      created_at: a.created_at,
+    };
+  });
 }
 
 export async function getAdminFinanceSummary(
@@ -298,6 +428,12 @@ export async function getAdminFinanceSummary(
     .select("platform_fee_kobo, net_kobo")
     .gte("date", new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
 
+  const { data: debtWallets } = await admin
+    .from("wallets")
+    .select("debt_kobo")
+    .eq("owner_type", "creator")
+    .gt("debt_kobo", 0);
+
   const payments_success_kobo = (payments ?? []).reduce(
     (s, p) => s + (p.amount_kobo ?? 0),
     0,
@@ -314,6 +450,10 @@ export async function getAdminFinanceSummary(
     (s, e) => s + (e.net_kobo ?? 0),
     0,
   );
+  const total_debt_kobo = (debtWallets ?? []).reduce(
+    (s, w) => s + (w.debt_kobo ?? 0),
+    0,
+  );
 
   return {
     payments_success_kobo,
@@ -322,6 +462,140 @@ export async function getAdminFinanceSummary(
     payouts_pending_kobo,
     platform_net_30d_kobo,
     active_subscriptions: subCount ?? 0,
+    total_debt_kobo,
+    creators_with_debt_count: debtWallets?.length ?? 0,
+  };
+}
+
+export async function listAdminCreatorDebts(
+  admin: SupabaseClient,
+  input: { limit?: number } = {},
+): Promise<AdminCreatorDebtRow[]> {
+  const { data, error } = await admin
+    .from("wallets")
+    .select("owner_id, debt_kobo, available_kobo, pending_kobo, held_kobo")
+    .eq("owner_type", "creator")
+    .gt("debt_kobo", 0)
+    .order("debt_kobo", { ascending: false })
+    .limit(input.limit ?? 50);
+
+  if (error || !data) return [];
+
+  const creatorIds = data.map((w) => w.owner_id);
+
+  const { data: profiles } = await admin
+    .from("profiles")
+    .select("id, username")
+    .in("id", creatorIds);
+
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p.username]));
+
+  return data.map((w) => ({
+    creator_id: w.owner_id,
+    creator_username: profileMap.get(w.owner_id) ?? null,
+    debt_kobo: w.debt_kobo,
+    available_kobo: w.available_kobo,
+    pending_kobo: w.pending_kobo,
+    held_kobo: w.held_kobo,
+  }));
+}
+
+export async function getAdminCreatorWalletDetail(
+  admin: SupabaseClient,
+  creatorId: string,
+): Promise<{
+  wallet: AdminWalletDetail | null;
+  transactions: WalletTransactionRow[];
+  disputes: AdminDisputeRow[];
+  payouts: AdminPayoutRow[];
+}> {
+  const [{ data: profile }, { data: wallet }] = await Promise.all([
+    admin.from("profiles").select("id, username, display_name").eq("id", creatorId).maybeSingle(),
+    admin
+      .from("wallets")
+      .select(
+        "id, owner_id, available_kobo, pending_kobo, held_kobo, debt_kobo, lifetime_credited_kobo, lifetime_debited_kobo",
+      )
+      .eq("owner_id", creatorId)
+      .eq("owner_type", "creator")
+      .maybeSingle(),
+  ]);
+
+  if (!wallet) {
+    return { wallet: null, transactions: [], disputes: [], payouts: [] };
+  }
+
+  const [{ data: transactions }, { data: disputeRows }, { data: payoutRows }] = await Promise.all([
+    admin
+      .from("wallet_transactions")
+      .select(
+        "id, wallet_id, payment_id, amount_kobo, balance_available_after_kobo, balance_pending_after_kobo, type, description, metadata, clears_at, created_at",
+      )
+      .eq("wallet_id", wallet.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    admin
+      .from("disputes")
+      .select(
+        "id, payment_id, creator_id, fan_id, status, amount_kobo, reason, evidence_due_at, resolution_notes, resolved_at, created_at, metadata",
+      )
+      .eq("creator_id", creatorId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    admin
+      .from("payout_requests")
+      .select(
+        "id, creator_id, amount_kobo, fee_kobo, net_amount_kobo, status, failure_reason, created_at, reviewed_at",
+      )
+      .eq("creator_id", creatorId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
+
+  const username = profile?.username ?? null;
+
+  const disputes: AdminDisputeRow[] = (disputeRows ?? []).map((d) => ({
+    id: d.id,
+    payment_id: d.payment_id,
+    creator_id: d.creator_id,
+    creator_username: username,
+    fan_id: d.fan_id,
+    fan_username: null,
+    status: d.status,
+    amount_kobo: d.amount_kobo,
+    reason: d.reason,
+    evidence_due_at: d.evidence_due_at,
+    resolution_notes: d.resolution_notes,
+    resolved_at: d.resolved_at,
+    created_at: d.created_at,
+    needs_manual_review: Boolean(
+      (d.metadata as Record<string, unknown> | null)?.needs_manual_review,
+    ),
+  }));
+
+  const payouts: AdminPayoutRow[] = (payoutRows ?? []).map((p) => ({
+    ...p,
+    creator_username: username,
+    wallet_held_kobo: wallet.held_kobo,
+    wallet_debt_kobo: wallet.debt_kobo,
+    open_disputes_count: disputes.filter((d) => d.status === "open").length,
+  }));
+
+  return {
+    wallet: {
+      creator_id: creatorId,
+      creator_username: profile?.username ?? null,
+      display_name: profile?.display_name ?? null,
+      available_kobo: wallet.available_kobo,
+      pending_kobo: wallet.pending_kobo,
+      held_kobo: wallet.held_kobo,
+      debt_kobo: wallet.debt_kobo,
+      lifetime_credited_kobo: wallet.lifetime_credited_kobo,
+      lifetime_debited_kobo: wallet.lifetime_debited_kobo,
+    },
+    transactions: (transactions ?? []) as WalletTransactionRow[],
+    disputes,
+    payouts,
   };
 }
 

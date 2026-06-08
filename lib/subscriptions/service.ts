@@ -62,6 +62,7 @@ export async function startSubscription(
     fanEmail: string;
     planId: string;
     offerId?: string;
+    bundleId?: string;
   },
 ): Promise<SubscribeResult> {
   const plan = await fetchPlanForSubscribe(supabase, input.planId);
@@ -110,8 +111,24 @@ export async function startSubscription(
   // Apply offer discount (first month only; renewals bill at full plan price)
   let checkoutAmountKobo = plan.price_kobo;
   let appliedOfferId: string | null = null;
+  let bundleMonths: number | null = null;
 
-  if (input.offerId && (plan.billing_interval === "monthly" || plan.billing_interval === "annual")) {
+  if (
+    input.bundleId &&
+    plan.billing_interval === "monthly"
+  ) {
+    const { getBundleById } = await import("@/lib/subscriptions/bundles");
+    const bundle = await getBundleById(supabase, input.bundleId);
+    if (bundle && bundle.plan_id === plan.id) {
+      checkoutAmountKobo = Math.round(
+        plan.price_kobo * bundle.months * (1 - bundle.discount_pct / 100),
+      );
+      bundleMonths = bundle.months;
+    }
+  } else if (
+    input.offerId &&
+    (plan.billing_interval === "monthly" || plan.billing_interval === "annual")
+  ) {
     const { getOfferById } = await import("@/lib/offers/queries");
     const offer = await getOfferById(supabase, input.offerId);
     if (offer && offer.plan_id === plan.id) {
@@ -143,6 +160,7 @@ export async function startSubscription(
         fan_id: input.fanId,
         creator_id: plan.creator_id,
         ...(appliedOfferId ? { offer_id: appliedOfferId } : {}),
+        ...(bundleMonths ? { bundle_months: bundleMonths } : {}),
       },
     })
     .select("id")
@@ -183,6 +201,7 @@ export async function startSubscription(
       billing_interval: plan.billing_interval,
       purpose: "subscription_checkout",
       ...(appliedOfferId ? { offer_id: appliedOfferId } : {}),
+      ...(bundleMonths ? { bundle_months: bundleMonths } : {}),
     },
   });
 
@@ -222,6 +241,8 @@ export async function completePaidSubscription(
     paystackCustomerCode?: string;
     authorizationCode?: string;
     amountKobo: number;
+    bundleMonths?: number;
+    giftId?: string;
   },
 ): Promise<string> {
   const plan = await fetchPlanForSubscribe(admin, input.planId);
@@ -235,6 +256,91 @@ export async function completePaidSubscription(
 
   if (existingPayment?.status === "success" && existingPayment.subscription_id) {
     return existingPayment.subscription_id;
+  }
+
+  // Gift purchases hand the prepaid grant to a recipient chosen by the payer.
+  // Look up the gift record (source of truth for who/how-long) before
+  // falling into the same one-time prepaid-grant mechanics as bundles.
+  let giftRecipientId: string | null = null;
+  let giftMonths: number | null = null;
+  if (input.giftId) {
+    const { data: gift } = await admin
+      .from("subscription_gifts")
+      .select("id, recipient_id, months, status")
+      .eq("id", input.giftId)
+      .maybeSingle();
+
+    if (gift && gift.status === "pending") {
+      giftRecipientId = gift.recipient_id;
+      giftMonths = gift.months;
+    }
+  }
+
+  const prepaidMonths = input.bundleMonths ?? giftMonths;
+
+  // Bundle and gift purchases are one-time prepaid charges — no recurring
+  // Paystack subscription is created, and the period spans the full prepaid
+  // duration rather than the plan's regular billing interval. Gifts target
+  // the recipient's account; bundles target the payer's own account.
+  if (prepaidMonths) {
+    const targetFanId = giftRecipientId ?? input.fanId;
+    const { addBundlePeriod } = await import("@/lib/subscriptions/period");
+    const blocking = await getBlockingSubscription(
+      admin,
+      targetFanId,
+      plan.creator_id,
+    );
+    const anchor =
+      blocking?.current_period_end &&
+      new Date(blocking.current_period_end).getTime() > Date.now()
+        ? new Date(blocking.current_period_end)
+        : new Date();
+
+    const { subscriptionId } = await activateSubscription(admin, {
+      fanId: targetFanId,
+      plan,
+      periodOverride: addBundlePeriod(anchor, prepaidMonths),
+      cancelAtPeriodEnd: true,
+      renewExistingId: blocking?.id,
+    });
+
+    if (input.giftId && giftRecipientId) {
+      await admin
+        .from("subscription_gifts")
+        .update({
+          status: "fulfilled",
+          subscription_id: subscriptionId,
+          fulfilled_at: new Date().toISOString(),
+        })
+        .eq("id", input.giftId);
+
+      try {
+        const { notifyGiftSubscription } = await import("@/lib/notifications/emit");
+        await notifyGiftSubscription(admin, {
+          recipientId: giftRecipientId,
+          gifterId: input.fanId,
+          creatorId: plan.creator_id,
+          planName: plan.name,
+          months: giftMonths ?? prepaidMonths,
+          subscriptionId,
+        });
+      } catch (err) {
+        console.error("[notifications] gift subscription", err);
+      }
+    }
+
+    await admin
+      .from("payments")
+      .update({
+        status: "success",
+        subscription_id: subscriptionId,
+        paystack_transaction_id: input.paystackTransactionId ?? null,
+        webhook_processed_at: new Date().toISOString(),
+        amount_kobo: input.amountKobo,
+      })
+      .eq("paystack_reference", input.paystackReference);
+
+    return subscriptionId;
   }
 
   let paystackSubscriptionCode: string | null = null;

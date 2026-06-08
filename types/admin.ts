@@ -31,6 +31,9 @@ export type AdminCreatorRow = {
   approved_at: string | null;
   created_at: string;
   subscriber_count?: number;
+  kyc_status: "none" | "pending" | "verified" | "rejected";
+  verification_note: string | null;
+  verification_rejected_reason: string | null;
 };
 
 export type AdminModerationItem = {
@@ -68,6 +71,40 @@ export type AdminPayoutRow = {
   failure_reason: string | null;
   created_at: string;
   reviewed_at: string | null;
+  wallet_held_kobo: number;
+  wallet_debt_kobo: number;
+  open_disputes_count: number;
+};
+
+export type AdminDisputeRow = {
+  id: string;
+  payment_id: string;
+  creator_id: string | null;
+  creator_username: string | null;
+  fan_id: string | null;
+  fan_username: string | null;
+  status: string;
+  amount_kobo: number;
+  reason: string | null;
+  evidence_due_at: string | null;
+  resolution_notes: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  needs_manual_review: boolean;
+};
+
+export type AdminAppealRow = {
+  id: string;
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  status: "pending" | "approved" | "denied";
+  account_status_at_submission: string;
+  current_account_status: string | null;
+  message: string;
+  admin_notes: string | null;
+  resolved_at: string | null;
+  created_at: string;
 };
 
 export type AdminAuditRow = {
@@ -87,4 +124,27 @@ export type AdminFinanceSummary = {
   payouts_pending_kobo: number;
   platform_net_30d_kobo: number;
   active_subscriptions: number;
+  total_debt_kobo: number;
+  creators_with_debt_count: number;
+};
+
+export type AdminCreatorDebtRow = {
+  creator_id: string;
+  creator_username: string | null;
+  debt_kobo: number;
+  available_kobo: number;
+  pending_kobo: number;
+  held_kobo: number;
+};
+
+export type AdminWalletDetail = {
+  creator_id: string;
+  creator_username: string | null;
+  display_name: string | null;
+  available_kobo: number;
+  pending_kobo: number;
+  held_kobo: number;
+  debt_kobo: number;
+  lifetime_credited_kobo: number;
+  lifetime_debited_kobo: number;
 };

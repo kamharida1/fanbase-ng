@@ -1,5 +1,88 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+export type StoryViewer = {
+  viewer_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  viewed_at: string;
+};
+
+export type StoryAnalyticsRow = {
+  id: string;
+  caption: string | null;
+  created_at: string;
+  expires_at: string;
+  is_active: boolean;
+  view_count: number;
+  viewers: StoryViewer[];
+};
+
+/**
+ * Returns the creator's recent stories (last 20) with per-story view counts
+ * and the list of viewers (up to 50 per story).
+ */
+export async function getStoryAnalytics(
+  supabase: SupabaseClient,
+  creatorId: string,
+): Promise<StoryAnalyticsRow[]> {
+  const now = new Date().toISOString();
+
+  // Fetch recent stories (active + expired within last 7 days)
+  const since = new Date(Date.now() - 7 * 24 * 3_600_000).toISOString();
+  const { data: stories, error } = await supabase
+    .from("posts")
+    .select("id, caption, created_at, expires_at")
+    .eq("creator_id", creatorId)
+    .eq("is_story", true)
+    .eq("status", "published")
+    .gte("expires_at", since)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error || !stories?.length) return [];
+
+  const storyIds = stories.map((s) => s.id);
+
+  // Fetch all views for these stories with viewer profiles in one query
+  const { data: views } = await supabase
+    .from("story_views")
+    .select("story_id, viewer_id, viewed_at, profiles!inner(username, display_name, avatar_url)")
+    .in("story_id", storyIds)
+    .order("viewed_at", { ascending: false });
+
+  // Group views by story_id
+  const viewsByStory = new Map<string, StoryViewer[]>();
+  for (const v of views ?? []) {
+    const profile = Array.isArray(v.profiles) ? v.profiles[0] : v.profiles;
+    if (!profile) continue;
+    const list = viewsByStory.get(v.story_id) ?? [];
+    if (list.length < 50) {
+      list.push({
+        viewer_id: v.viewer_id,
+        username: profile.username,
+        display_name: profile.display_name,
+        avatar_url: profile.avatar_url,
+        viewed_at: v.viewed_at,
+      });
+    }
+    viewsByStory.set(v.story_id, list);
+  }
+
+  return stories.map((s) => {
+    const viewers = viewsByStory.get(s.id) ?? [];
+    return {
+      id: s.id,
+      caption: s.caption,
+      created_at: s.created_at,
+      expires_at: s.expires_at,
+      is_active: s.expires_at > now,
+      view_count: viewers.length,
+      viewers,
+    };
+  });
+}
+
 export type StoryItem = {
   id: string;
   creator_id: string;

@@ -5,7 +5,8 @@ export type SubscriptionStatus =
   | "active"
   | "past_due"
   | "cancelled"
-  | "expired";
+  | "expired"
+  | "paused";
 
 export type SubscriptionPlanRow = {
   id: string;
@@ -22,6 +23,44 @@ export type SubscriptionPlanRow = {
   trial_days: number;
 };
 
+export type SubscriptionPlanBundleRow = {
+  id: string;
+  plan_id: string;
+  months: 3 | 6 | 12;
+  discount_pct: number;
+  is_active: boolean;
+};
+
+export type SubscriptionGiftStatus = "pending" | "fulfilled" | "failed";
+
+export type SubscriptionGiftRow = {
+  id: string;
+  gifter_id: string;
+  recipient_id: string;
+  creator_id: string;
+  plan_id: string;
+  months: 1 | 3 | 6 | 12;
+  amount_kobo: number;
+  message: string | null;
+  status: SubscriptionGiftStatus;
+  fulfilled_at: string | null;
+  created_at: string;
+  plan?: {
+    id: string;
+    name: string;
+    billing_interval: PlanBillingInterval;
+  };
+  recipient?: {
+    username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+  creator?: {
+    username: string;
+    display_name: string | null;
+  };
+};
+
 export type FanSubscriptionRow = {
   id: string;
   fan_id: string;
@@ -34,6 +73,7 @@ export type FanSubscriptionRow = {
   cancel_at_period_end: boolean;
   cancelled_at: string | null;
   ended_at: string | null;
+  paused_at: string | null;
   created_at: string;
   plan?: {
     id: string;

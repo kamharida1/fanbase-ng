@@ -1,9 +1,17 @@
 import { SubscriptionsManager } from "@/components/subscriptions/subscriptions-manager";
 import { VerifyCheckout } from "@/components/subscriptions/verify-checkout";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
+import { formatNgnFromKobo } from "@/lib/creators/format";
+import { listGiftsSentByUser } from "@/lib/subscriptions/gifting";
 import { listFanSubscriptions } from "@/lib/subscriptions/queries";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+
+const GIFT_STATUS_LABELS: Record<string, string> = {
+  pending: "Processing",
+  fulfilled: "Delivered",
+  failed: "Failed",
+};
 
 type PageProps = {
   searchParams: Promise<{
@@ -18,7 +26,10 @@ export default async function SubscriptionsPage({ searchParams }: PageProps) {
   const auth = await getAuthContext(supabase);
   if (!auth) redirect("/login?next=/subscriptions");
 
-  const subscriptions = await listFanSubscriptions(supabase, auth.userId);
+  const [subscriptions, gifts] = await Promise.all([
+    listFanSubscriptions(supabase, auth.userId),
+    listGiftsSentByUser(supabase, auth.userId),
+  ]);
   const params = await searchParams;
 
   return (
@@ -36,6 +47,45 @@ export default async function SubscriptionsPage({ searchParams }: PageProps) {
         </p>
       ) : null}
       <SubscriptionsManager subscriptions={subscriptions} />
+
+      {gifts.length > 0 ? (
+        <section className="mt-10">
+          <h2 className="text-lg font-semibold">Gifts you&apos;ve sent</h2>
+          <ul className="mt-3 space-y-2">
+            {gifts.map((gift) => (
+              <li
+                key={gift.id}
+                className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm"
+              >
+                <div>
+                  <p className="font-medium">
+                    {gift.months} {gift.months === 1 ? "month" : "months"} of{" "}
+                    {gift.plan?.name ?? "a plan"} for{" "}
+                    {gift.recipient?.display_name ?? `@${gift.recipient?.username ?? "user"}`}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {formatNgnFromKobo(gift.amount_kobo)} ·{" "}
+                    {new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(
+                      new Date(gift.created_at),
+                    )}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                    gift.status === "fulfilled"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                      : gift.status === "failed"
+                        ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                        : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                  }`}
+                >
+                  {GIFT_STATUS_LABELS[gift.status] ?? gift.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

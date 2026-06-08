@@ -31,6 +31,8 @@ export function parseSubscriptionCheckoutMetadata(
   const creatorId = asString(meta.creator_id);
   const billingInterval = asString(meta.billing_interval);
   const purpose = asString(meta.purpose);
+  const bundleMonths = asNumber(meta.bundle_months);
+  const giftId = asString(meta.gift_id);
 
   if (
     !fanId ||
@@ -48,6 +50,8 @@ export function parseSubscriptionCheckoutMetadata(
     creator_id: creatorId,
     billing_interval: billingInterval,
     purpose: PAYSTACK_SUBSCRIPTION_PURPOSE,
+    ...(bundleMonths ? { bundle_months: bundleMonths } : {}),
+    ...(giftId ? { gift_id: giftId } : {}),
   };
 }
 

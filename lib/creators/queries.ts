@@ -192,7 +192,7 @@ export async function getCreatorStudioProfile(
 ) {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_url, role")
+    .select("id, username, display_name, avatar_url, role, kyc_status, verification_note, verification_rejected_reason")
     .eq("id", userId)
     .single();
 

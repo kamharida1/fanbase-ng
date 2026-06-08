@@ -46,4 +46,6 @@ export type SubscriptionCheckoutMetadata = {
   creator_id: string;
   billing_interval: string;
   purpose: typeof PAYSTACK_SUBSCRIPTION_PURPOSE;
+  bundle_months?: number;
+  gift_id?: string;
 };
