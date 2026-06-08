@@ -309,13 +309,15 @@ export async function enrichPost(
 export async function listCreatorPosts(
   supabase: SupabaseClient,
   creatorId: string,
+  limit = 200,
 ): Promise<PostRow[]> {
   const { data, error } = await supabase
     .from("posts")
     .select("*")
     .eq("creator_id", creatorId)
     .neq("status", "removed")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
   if (error || !data) return [];
 

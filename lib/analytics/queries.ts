@@ -117,11 +117,14 @@ export async function getSubscriberGrowthByMonth(
   since.setDate(1);
   since.setHours(0, 0, 0, 0);
 
+  // Limit is months × estimated max subs per month; generous ceiling that
+  // prevents a full table scan while fitting in a single response.
   const { data } = await supabase
     .from("subscriptions")
     .select("created_at")
     .eq("creator_id", creatorId)
-    .gte("created_at", since.toISOString());
+    .gte("created_at", since.toISOString())
+    .limit(months * 10_000);
 
   const countByMonth = new Map<string, number>();
   for (const row of data ?? []) {
@@ -150,7 +153,8 @@ export async function getEarningsByMonth(
     .from("earnings_daily")
     .select("date, gross_kobo, net_kobo")
     .eq("creator_id", creatorId)
-    .gte("date", sinceDate);
+    .gte("date", sinceDate)
+    .limit(months * 31); // one row per day max
 
   type Acc = { gross_kobo: number; net_kobo: number };
   const byMonth = new Map<string, Acc>();

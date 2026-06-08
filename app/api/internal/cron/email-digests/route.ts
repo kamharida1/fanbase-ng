@@ -6,6 +6,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 const MS_DAY = 86_400_000;
 const DUE_AFTER_DAYS = 6;
+// Cap per cron invocation to stay well within Vercel's function timeout.
+// The scheduler fires this route daily, so the backlog drains across runs.
+const BATCH_PER_RUN = 200;
 
 export async function POST(request: Request) {
   if (!verifyCronBearer(request.headers.get("authorization"))) {
@@ -20,7 +23,9 @@ export async function POST(request: Request) {
     .select("user_id")
     .eq("digest_enabled", true)
     .eq("email_enabled", true)
-    .or(`last_digest_sent_at.is.null,last_digest_sent_at.lt.${dueBefore}`);
+    .or(`last_digest_sent_at.is.null,last_digest_sent_at.lt.${dueBefore}`)
+    .limit(BATCH_PER_RUN)
+    .order("last_digest_sent_at", { ascending: true, nullsFirst: true });
 
   let sent = 0;
   for (const candidate of candidates ?? []) {

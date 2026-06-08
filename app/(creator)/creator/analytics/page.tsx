@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { BarChart } from "@/components/analytics/bar-chart";
@@ -15,7 +16,9 @@ import {
 import { getStoryAnalytics } from "@/lib/stories/queries";
 import { createClient } from "@/lib/supabase/server";
 
-export const dynamic = "force-dynamic";
+// Analytics data is expensive but doesn't need to be real-time.
+// Cache per-creator for 5 minutes; revalidated on next visit after TTL expires.
+const ANALYTICS_TTL = 300; // 5 minutes
 
 export default async function CreatorAnalyticsPage() {
   const supabase = await createClient();
@@ -24,19 +27,18 @@ export default async function CreatorAnalyticsPage() {
   if (auth.profile.role !== "creator") redirect("/settings");
 
   const [summary, subscriberGrowth, earningsByMonth, topPosts, storyAnalytics] =
-    await Promise.all([
-      getAnalyticsSummary(supabase, auth.userId),
-      getSubscriberGrowthByMonth(supabase, auth.userId, 6),
-      getEarningsByMonth(supabase, auth.userId, 6),
-      getTopPosts(supabase, auth.userId, 10),
-      getStoryAnalytics(supabase, auth.userId),
-    ]);
-
-  const maxSubscribers = Math.max(...subscriberGrowth.map((p) => p.value), 1);
-  const maxEarnings = Math.max(
-    ...earningsByMonth.map((p) => p.gross_kobo),
-    1,
-  );
+    await unstable_cache(
+      () =>
+        Promise.all([
+          getAnalyticsSummary(supabase, auth.userId),
+          getSubscriberGrowthByMonth(supabase, auth.userId, 6),
+          getEarningsByMonth(supabase, auth.userId, 6),
+          getTopPosts(supabase, auth.userId, 10),
+          getStoryAnalytics(supabase, auth.userId),
+        ]),
+      [`analytics:creator:${auth.userId}`],
+      { revalidate: ANALYTICS_TTL, tags: [`analytics:${auth.userId}`] },
+    )();
 
   return (
     <div className="space-y-10">
