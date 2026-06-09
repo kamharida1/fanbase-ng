@@ -34,6 +34,8 @@ export type AuditAction =
   | "wallet.credited"
   | "wallet.cleared"
   | "wallet.payout_requested"
+  | "wallet.payout_completed"
+  | "wallet.payout_failed"
   | "wallet.reversed_refund"
   | "media.upload.confirmed"
   | "media.scan.completed"
@@ -48,7 +50,22 @@ export type AuditAction =
   | "account.deletion_requested"
   | "account.deletion_cancelled"
   | "account.deletion_completed"
-  | "subscription.gift_initiated";
+  | "subscription.gift_initiated"
+  | "account.data_export_requested"
+  | "media.content_scan.violation"
+  | "admin.content_hashes.imported"
+  | "admin.content_hashes.deleted"
+  | "creator.velocity_flagged"
+  | "creator.payout_held"
+  | "copyright.claim_submitted"
+  | "copyright.counter_notice_submitted"
+  | "copyright.auto_removed"
+  | "copyright.admin_resolved"
+  | "account.signup_blocked_disposable_email"
+  | "account.impersonation_reported"
+  | "payment.chargeback_loss_recorded"
+  | "account.payment_suspended"
+  | "payment.card_sharing_flagged";
 
 export type WriteAuditLogInput = {
   actorId?: string | null;

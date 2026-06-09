@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { storeCardFingerprintAndCheck } from "@/lib/payments/card-fingerprint";
+import { logger } from "@/lib/logger";
 import { parseTipMetadata, parseSubscriptionCheckoutMetadata } from "@/lib/paystack/parse";
 import { chargeAmountMatchesPayment } from "@/lib/security/payment-amount";
 import { creditCreatorFromPayment } from "@/lib/wallets/ledger";
@@ -173,7 +175,7 @@ export async function fulfillSubscriptionPayment(
       paymentId: updated?.id ?? payment?.id ?? "",
       paymentAmountKobo: amount,
     }),
-  ).catch((err) => console.error("[referral] qualify failed", err));
+  ).catch((err) => logger.error("referral.qualify_failed", { err, paymentId }));
 
   const paymentId = updated?.id ?? payment?.id;
   if (paymentId && meta.creator_id) {
@@ -186,8 +188,32 @@ export async function fulfillSubscriptionPayment(
         description: "Subscription payment",
       });
     } catch (err) {
-      console.error("[wallet] credit after payment", err);
+      logger.error("wallet.subscription_credit_failed", {
+        err,
+        paymentId,
+        creatorId: meta.creator_id,
+        grossKobo: amount,
+        idempotencyKey: `payment:${paymentId}:credit`,
+      });
     }
+  }
+
+  // Card fingerprint — fire-and-forget; never blocks payment fulfillment.
+  const sig = typeof authorization?.signature === "string" ? authorization.signature : null;
+  const authCode = typeof authorization?.authorization_code === "string"
+    ? authorization.authorization_code
+    : null;
+  if (sig && authCode) {
+    storeCardFingerprintAndCheck(admin, {
+      signature: sig,
+      authorizationCode: authCode,
+      last4: typeof authorization?.last4 === "string" ? authorization.last4 : null,
+      bank: typeof authorization?.bank === "string" ? authorization.bank : null,
+      cardType: typeof authorization?.card_type === "string" ? authorization.card_type : null,
+      payerId: meta.fan_id,
+    }).catch((err) =>
+      logger.warn("card_fingerprint.check_failed", { err, fanId: meta.fan_id }),
+    );
   }
 
   return {
@@ -298,7 +324,13 @@ export async function fulfillTipPayment(
         description: "Fan tip",
       });
     } catch (err) {
-      console.error("[wallet] tip credit", err);
+      logger.error("wallet.tip_credit_failed", {
+        err,
+        paymentId: payment.id,
+        creatorId: meta.creator_id,
+        grossKobo: amount,
+        idempotencyKey: `tip:${payment.id}:credit`,
+      });
     }
 
     try {
@@ -310,7 +342,7 @@ export async function fulfillTipPayment(
         paymentId: payment.id,
       });
     } catch (err) {
-      console.error("[notifications] tip", err);
+      logger.warn("notifications.tip_failed", { err, paymentId: payment.id });
     }
   }
 
@@ -410,7 +442,13 @@ export async function recordSubscriptionRenewal(
         description: "Subscription renewal",
       });
     } catch (err) {
-      console.error("[wallet] credit after renewal", err);
+      logger.error("wallet.renewal_credit_failed", {
+        err,
+        paymentId: renewalPaymentId,
+        creatorId: input.creatorId,
+        grossKobo: input.amountKobo,
+        idempotencyKey: `payment:${renewalPaymentId}:credit`,
+      });
     }
   }
 }

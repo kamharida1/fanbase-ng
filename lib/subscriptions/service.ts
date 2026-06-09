@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { logger } from "@/lib/logger";
 import {
   buildPaymentReference,
   createPaystackSubscription,
@@ -43,12 +44,26 @@ export async function ensurePaystackPlanCode(
     billingInterval: plan.billing_interval,
   });
 
-  await supabase
+  // Conditional write: only update if no other concurrent process already set
+  // the code. If the write matches 0 rows, a race was lost — fetch the winner's
+  // code. The Paystack plan we just created becomes an orphan (harmless).
+  const { data: updated } = await supabase
     .from("subscription_plans")
     .update({ paystack_plan_code: code })
-    .eq("id", plan.id);
+    .eq("id", plan.id)
+    .is("paystack_plan_code", null)
+    .select("paystack_plan_code")
+    .single();
 
-  return code;
+  if (updated) return updated.paystack_plan_code;
+
+  const { data: current } = await supabase
+    .from("subscription_plans")
+    .select("paystack_plan_code")
+    .eq("id", plan.id)
+    .single();
+
+  return current?.paystack_plan_code ?? code;
 }
 
 export type SubscribeResult =
@@ -74,6 +89,38 @@ export async function startSubscription(
     throw new Error("You cannot subscribe to your own profile.");
   }
 
+  // Block fans whose payment capability has been suspended due to chargebacks
+  if (plan.billing_interval !== "free") {
+    const { data: fanProfile } = await supabase
+      .from("profiles")
+      .select("payment_suspended")
+      .eq("id", input.fanId)
+      .single();
+
+    if (fanProfile?.payment_suspended) {
+      throw new Error(
+        "Your payment capability has been suspended. Please contact support to resolve this.",
+      );
+    }
+
+    // Failed payment cooldown — 3 failures in the last hour → 1h hold.
+    // Prevents rapid card-testing of stolen credentials.
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count: recentFailures } = await supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("payer_id", input.fanId)
+      .eq("type", "subscription")
+      .eq("status", "failed")
+      .gte("created_at", oneHourAgo);
+
+    if ((recentFailures ?? 0) >= 3) {
+      throw new Error(
+        "Too many failed payment attempts. Please wait an hour before trying again, or contact support.",
+      );
+    }
+  }
+
   const { data: creator } = await supabase
     .from("creator_profiles")
     .select("is_accepting_subscribers")
@@ -82,6 +129,21 @@ export async function startSubscription(
 
   if (!creator?.is_accepting_subscribers) {
     throw new Error("This creator is not accepting new subscribers.");
+  }
+
+  // Minimum content requirement: paid plans require ≥3 published posts
+  if (plan.billing_interval !== "free") {
+    const { count } = await supabase
+      .from("posts")
+      .select("id", { count: "exact", head: true })
+      .eq("creator_id", plan.creator_id)
+      .eq("status", "published");
+
+    if ((count ?? 0) < 3) {
+      throw new Error(
+        "This creator needs to publish at least 3 posts before accepting paid subscriptions.",
+      );
+    }
   }
 
   // Check if this fan is blocked by the creator
@@ -137,6 +199,24 @@ export async function startSubscription(
       );
       appliedOfferId = offer.id;
     }
+  }
+
+  // Guard: one pending checkout per fan+creator within 24 hours to prevent
+  // duplicate payment rows accumulating from abandoned checkout sessions.
+  const { data: stalePending } = await supabase
+    .from("payments")
+    .select("id")
+    .eq("payer_id", input.fanId)
+    .eq("creator_id", plan.creator_id)
+    .eq("type", "subscription")
+    .eq("status", "pending")
+    .gt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .maybeSingle();
+
+  if (stalePending) {
+    throw new Error(
+      "You have a pending checkout session for this creator. Please complete it or wait for it to expire.",
+    );
   }
 
   const reference = buildPaymentReference();
@@ -325,7 +405,7 @@ export async function completePaidSubscription(
           subscriptionId,
         });
       } catch (err) {
-        console.error("[notifications] gift subscription", err);
+        logger.warn("notifications.gift_subscription_failed", { err, subscriptionId });
       }
     }
 
@@ -370,7 +450,7 @@ export async function completePaidSubscription(
           });
           paystackSubscriptionCode = sub.subscription_code;
         } catch (err) {
-          console.error("[paystack] create subscription", err, profile?.id);
+          logger.warn("paystack.create_subscription_failed", { err, userId: profile?.id });
         }
       }
     }

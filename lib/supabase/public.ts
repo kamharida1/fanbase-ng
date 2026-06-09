@@ -1,5 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+const CACHE_KEY = "__supabase_public_client__";
+type GlobalCache = typeof globalThis & { [CACHE_KEY]?: SupabaseClient };
+
 export function hasPublicSupabaseEnv(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
@@ -13,6 +16,9 @@ export function hasPublicSupabaseEnv(): boolean {
  * Only queries that are readable by the anon role (public RLS) work here.
  */
 export function createPublicClient(): SupabaseClient {
+  const g = globalThis as GlobalCache;
+  if (g[CACHE_KEY]) return g[CACHE_KEY]!;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
@@ -22,5 +28,7 @@ export function createPublicClient(): SupabaseClient {
     );
   }
 
-  return createClient(url, key, { auth: { persistSession: false } });
+  const client = createClient(url, key, { auth: { persistSession: false } });
+  g[CACHE_KEY] = client;
+  return client;
 }
