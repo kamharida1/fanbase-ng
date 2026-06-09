@@ -28,22 +28,26 @@ export function LoginForm() {
     setError(null);
     setLoading(true);
 
-    const result = await signInWithEmail(email, password);
+    try {
+      const result = await signInWithEmail(email, password);
 
-    if (!result.success) {
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+
+      await recordSession(
+        typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      );
+
+      const dest = await resolvePostLoginPath(next);
+      router.push(dest);
+      router.refresh();
+    } catch {
+      setError("Something went wrong while signing in. Please try again.");
+    } finally {
       setLoading(false);
-      setError(result.error);
-      return;
     }
-
-    await recordSession(
-      typeof navigator !== "undefined" ? navigator.userAgent : undefined,
-    );
-
-    const dest = await resolvePostLoginPath(next);
-    setLoading(false);
-    router.push(dest);
-    router.refresh();
   }
 
   return (

@@ -75,35 +75,38 @@ export function SignupForm() {
 
     setLoading(true);
 
-    const result = await signUpWithEmail({
-      email,
-      password,
-      displayName: displayName || undefined,
-      username: normalizedUsername || undefined,
-      dateOfBirth,
-      refCode: refCode || undefined,
-    });
+    try {
+      const result = await signUpWithEmail({
+        email,
+        password,
+        displayName: displayName || undefined,
+        username: normalizedUsername || undefined,
+        dateOfBirth,
+        refCode: refCode || undefined,
+      });
 
-    if (!result.success) {
-      setLoading(false);
-      setError(result.error);
-      return;
-    }
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
 
-    if (!result.requiresEmailVerification) {
-      await recordSession(
-        typeof navigator !== "undefined" ? navigator.userAgent : undefined,
-      );
-      const dest = await resolvePostLoginPath("/feed");
-      setLoading(false);
-      router.push(dest);
+      if (!result.requiresEmailVerification) {
+        await recordSession(
+          typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+        );
+        const dest = await resolvePostLoginPath("/feed");
+        router.push(dest);
+        router.refresh();
+        return;
+      }
+
+      router.push("/verify?message=verify_email");
       router.refresh();
-      return;
+    } catch {
+      setError("Something went wrong while creating your account. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
-    router.push("/verify?message=verify_email");
-    router.refresh();
   }
 
   return (
