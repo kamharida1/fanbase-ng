@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { logger } from "@/lib/logger";
 import {
   EARNINGS_CLEARANCE_DAYS,
   PAYMENT_FEE_BPS,
@@ -35,7 +36,7 @@ export async function creditCreatorFromPayment(
   });
 
   if (error) {
-    console.error("[wallet credit]", error.message, input.paymentId);
+    logger.error("wallet.credit_failed", { err: error, paymentId: input.paymentId, creatorId: input.creatorId });
     throw new Error(error.message);
   }
 
@@ -52,7 +53,83 @@ export async function creditCreatorFromPayment(
     },
   });
 
+  if ((input.txType ?? "subscription_credit") === "subscription_credit") {
+    try {
+      await stampFirstSubscriberPaidAndCheckVelocity(admin, input.creatorId);
+    } catch (err) {
+      logger.warn("creator.velocity_check_failed", { err, creatorId: input.creatorId });
+    }
+  }
+
   return data as string | null;
+}
+
+async function stampFirstSubscriberPaidAndCheckVelocity(
+  admin: SupabaseClient,
+  creatorId: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  // Stamp only if not yet set (idempotent first-payment detection).
+  await admin
+    .from("creator_profiles")
+    .update({ first_subscriber_paid_at: now })
+    .eq("user_id", creatorId)
+    .is("first_subscriber_paid_at", null);
+
+  const { data: cp } = await admin
+    .from("creator_profiles")
+    .select("first_subscriber_paid_at")
+    .eq("user_id", creatorId)
+    .single();
+
+  if (!cp?.first_subscriber_paid_at) return;
+
+  const windowStart = new Date(cp.first_subscriber_paid_at);
+  const windowEnd = new Date(windowStart.getTime() + 72 * 60 * 60 * 1000);
+  if (new Date() > windowEnd) return;
+
+  const { data: payments } = await admin
+    .from("payments")
+    .select("amount_kobo")
+    .eq("creator_id", creatorId)
+    .eq("status", "success")
+    .gte("created_at", windowStart.toISOString())
+    .lte("created_at", windowEnd.toISOString());
+
+  const totalKobo = (payments ?? []).reduce(
+    (sum: number, p: { amount_kobo: number }) => sum + (p.amount_kobo ?? 0),
+    0,
+  );
+
+  const VELOCITY_THRESHOLD_KOBO = 10_000_000; // ₦100k
+  if (totalKobo < VELOCITY_THRESHOLD_KOBO) return;
+
+  await admin
+    .from("moderation_queue")
+    .upsert(
+      {
+        entity_type: "creator",
+        entity_id: creatorId,
+        priority_score: 300,
+        flags: {
+          velocity_alert: true,
+          amount_kobo: totalKobo,
+          window_hours: 72,
+          first_paid_at: cp.first_subscriber_paid_at,
+        },
+      },
+      { onConflict: "entity_type,entity_id", ignoreDuplicates: false },
+    );
+
+  await writeAuditLog(admin, {
+    actorId: creatorId,
+    actorType: "system",
+    action: "creator.velocity_flagged",
+    entityType: "creator_profiles",
+    entityId: creatorId,
+    metadata: { amount_kobo: totalKobo, window_hours: 72 },
+  });
 }
 
 export async function runWalletClearances(
@@ -78,7 +155,7 @@ export async function reverseCreatorPaymentCredit(
   });
 
   if (error) {
-    console.error("[wallet refund]", error.message);
+    logger.error("wallet.refund_reversal_failed", { err: error, paymentId: input.paymentId, creatorId: input.creatorId });
     return false;
   }
 
@@ -102,7 +179,7 @@ export async function holdCreatorPaymentForDispute(
   });
 
   if (error) {
-    console.error("[wallet dispute hold]", error.message);
+    logger.error("wallet.dispute_hold_failed", { err: error, disputeId: input.disputeId, creatorId: input.creatorId });
     return false;
   }
 
@@ -124,7 +201,7 @@ export async function releaseDisputeHold(
   });
 
   if (error) {
-    console.error("[wallet dispute release]", error.message);
+    logger.error("wallet.dispute_release_failed", { err: error, disputeId: input.disputeId, creatorId: input.creatorId });
     return false;
   }
 
@@ -146,7 +223,7 @@ export async function finalizeDisputeLoss(
   });
 
   if (error) {
-    console.error("[wallet dispute finalize]", error.message);
+    logger.error("wallet.dispute_finalize_failed", { err: error, disputeId: input.disputeId, creatorId: input.creatorId });
     return false;
   }
 

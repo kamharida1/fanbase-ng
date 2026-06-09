@@ -20,6 +20,7 @@ export const sendMessageSchema = z.object({
   attachmentFilename: z.string().max(255).optional(),
   attachmentSizeBytes: z.number().int().positive().optional(),
   mediaUploadId: z.string().uuid().optional(),
+  idempotencyKey: z.string().max(128).optional(),
 }).refine(
   (data) =>
     (data.body && data.body.length > 0) ||

@@ -25,10 +25,23 @@ describe("reserveWebhookEvent", () => {
     expect(result).toBe("new");
   });
 
-  it("returns duplicate on unique violation", async () => {
+  it("returns duplicate on unique violation with a previously succeeded row", async () => {
+    const processedAt = new Date(Date.now() - 60_000).toISOString();
     const admin = {
-      from: vi.fn().mockReturnValue({
-        insert: vi.fn().mockResolvedValue({ error: { code: "23505" } }),
+      from: vi.fn((table: string) => {
+        if (table === "paystack_webhook_events") {
+          return {
+            insert: vi.fn().mockResolvedValue({ error: { code: "23505" } }),
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { processed_at: processedAt, error_message: null, created_at: processedAt },
+                }),
+              }),
+            }),
+          };
+        }
+        return {};
       }),
     };
     const result = await reserveWebhookEvent(admin as never, {

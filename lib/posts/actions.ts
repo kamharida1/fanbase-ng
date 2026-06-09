@@ -4,6 +4,8 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireAuth } from "@/lib/auth/get-auth-context";
+import { getAccountAge } from "@/lib/auth/account-age";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { extractHashtags } from "@/lib/posts/hashtags";
 import {
   commentSchema,
@@ -79,6 +81,23 @@ export async function savePost(
 
   if (auth.profile.role !== "creator") {
     return { success: false, error: "Creator account required." };
+  }
+
+  // Rate-limit new post publishes. Drafts and edits are exempt.
+  const isNewPost = !parsed.data.postId;
+  const isPublishing = parsed.data.publishNow === true;
+  if (isNewPost && isPublishing) {
+    const { isNew: accountIsNew } = await getAccountAge(supabase, auth.userId);
+    const postRl = await checkRateLimit(
+      `postCreate:${auth.userId}`,
+      accountIsNew ? RATE_LIMITS.postCreateNewAccount : RATE_LIMITS.postCreate,
+    );
+    if (!postRl.ok) {
+      return {
+        success: false,
+        error: `You're publishing too quickly. Try again in ${postRl.retryAfterSeconds}s.`,
+      };
+    }
   }
 
   const ppvKobo =

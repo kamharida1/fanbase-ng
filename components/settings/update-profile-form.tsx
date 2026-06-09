@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { updateProfileAction } from "@/lib/settings/actions";
 import { Button } from "@/components/ui/button";
@@ -18,14 +19,12 @@ export function UpdateProfileForm({
 }) {
   const [name, setName] = useState(displayName ?? "");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setMessage(null);
 
     const result = await updateProfileAction({ display_name: name });
 
@@ -34,7 +33,7 @@ export function UpdateProfileForm({
       setError(result.error);
       return;
     }
-    setMessage("Profile updated.");
+    toast.success("Profile updated.");
   }
 
   return (
@@ -62,9 +61,6 @@ export function UpdateProfileForm({
         <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
-      ) : null}
-      {message ? (
-        <p className="text-sm text-muted-foreground">{message}</p>
       ) : null}
       <Button type="submit" disabled={loading}>
         {loading ? "Saving…" : "Save profile"}

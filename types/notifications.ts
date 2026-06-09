@@ -15,7 +15,8 @@ export type NotificationType =
   | "resubscribe_reminder"
   | "account_deletion"
   | "gift_subscription"
-  | "missed_call";
+  | "missed_call"
+  | "copyright_claim";
 
 export type NotificationStatus = "pending" | "sent" | "failed" | "read";
 

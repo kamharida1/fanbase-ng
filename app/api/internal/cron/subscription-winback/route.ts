@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isFanBlocked } from "@/lib/fans/queries";
+import { logger } from "@/lib/logger";
 import { notifyWinBackReminder } from "@/lib/notifications/emit";
 import { verifyCronBearer } from "@/lib/security/cron-auth";
 import { getBlockingSubscription } from "@/lib/subscriptions/lifecycle";
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const startMs = Date.now();
   const admin = createAdminClient();
   const now = Date.now();
   const windowEnd = new Date(now - WIN_BACK_DELAY_DAYS * MS_DAY);
@@ -34,9 +36,10 @@ export async function POST(request: Request) {
       await notifyWinBackReminder(admin, candidate);
       sent += 1;
     } catch (err) {
-      console.error("[subscription-winback]", candidate.subscriptionId, err);
+      logger.warn("cron.winback_notify_failed", { err, subscriptionId: candidate.subscriptionId });
     }
   }
 
+  logger.info("cron.winback_completed", { candidates: candidates.length, sent, durationMs: Date.now() - startMs });
   return NextResponse.json({ ok: true, candidates: candidates.length, sent });
 }

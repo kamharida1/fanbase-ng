@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 import { uploadFileWithPresign } from "@/lib/media/client-upload";
@@ -233,6 +234,7 @@ export function PostEditor({
     setLoading(false);
     if (!result.success) { setError(result.error); return; }
     if (result.data?.postId) setPostId(result.data.postId);
+    toast.success(publishNow ? "Post published!" : "Post saved.");
     router.push("/creator/content");
     router.refresh();
   }

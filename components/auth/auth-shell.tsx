@@ -12,6 +12,7 @@ type AuthShellProps = {
   nav: NavLink[];
   children: React.ReactNode;
   variant?: "default" | "admin";
+  bottomNav?: React.ReactNode;
 };
 
 export function AuthShell({
@@ -19,6 +20,7 @@ export function AuthShell({
   nav,
   children,
   variant = "default",
+  bottomNav,
 }: AuthShellProps) {
   const label =
     auth.profile.display_name ?? auth.profile.username ?? auth.email;
@@ -46,9 +48,15 @@ export function AuthShell({
           </div>
         </nav>
       </header>
-      <main className="mx-auto min-w-0 max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <main
+        className={cn(
+          "mx-auto min-w-0 max-w-6xl px-4 py-6 sm:px-6 sm:py-8",
+          bottomNav && "pb-24 sm:pb-8",
+        )}
+      >
         {children}
       </main>
+      {bottomNav}
     </div>
   );
 }

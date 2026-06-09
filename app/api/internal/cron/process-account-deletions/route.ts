@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { logger } from "@/lib/logger";
 import { notifyAccountDeletion } from "@/lib/notifications/emit";
 import { verifyCronBearer } from "@/lib/security/cron-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -53,6 +54,13 @@ export async function POST(request: Request) {
       // account's email via auth.users (which we deliberately don't delete).
       await notifyAccountDeletion(admin, { userId: profile.id, stage: "completed" });
 
+      // Wipe stored payout/bank account data — financial PII must not persist
+      // after account deletion per NDPR data minimisation requirements.
+      await admin
+        .from("payout_accounts")
+        .delete()
+        .eq("creator_id", profile.id);
+
       await admin
         .from("profiles")
         .update({
@@ -78,7 +86,7 @@ export async function POST(request: Request) {
 
       completed += 1;
     } catch (err) {
-      console.error("[process-account-deletions]", profile.id, err);
+      logger.error("cron.account_deletion_failed", { err, userId: profile.id });
     }
   }
 

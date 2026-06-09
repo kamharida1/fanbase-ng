@@ -24,6 +24,8 @@ import {
   enqueueVirusScan,
   finalizeUploadAfterScan,
 } from "@/lib/media/virus-scan";
+import { runContentScan, runContentScanFromUrl } from "@/lib/media/content-scan";
+import { applyContentScanResult } from "@/lib/media/violation-handler";
 import type {
   ConfirmUploadResponse,
   MediaDeliveryResponse,
@@ -302,6 +304,16 @@ export async function confirmMediaUpload(
     .eq("id", upload.id)
     .single()).data as MediaUploadRow;
 
+  // ── Content moderation scan (R2 images only; Stream videos are scanned
+  //    via thumbnail in handleStreamWebhook when the video becomes ready) ──
+  if (refreshed.provider === "r2") {
+    const contentResult = await runContentScan(admin, refreshed);
+    const { blocked } = await applyContentScanResult(admin, refreshed, contentResult);
+    if (blocked) {
+      return { error: "Upload rejected: content policy violation." };
+    }
+  }
+
   await admin
     .from("media_uploads")
     .update({ status: "scanning" })
@@ -469,15 +481,28 @@ export async function handleStreamWebhook(
   const row = upload as MediaUploadRow;
 
   if (input.state === "ready") {
+    const thumbnailUrl =
+      input.thumbnail ??
+      `https://videodelivery.net/${input.streamUid}/thumbnails/thumbnail.jpg`;
+
     await admin
       .from("post_media")
-      .update({
-        processing_status: "ready",
-        thumbnail_url:
-          input.thumbnail ??
-          `https://videodelivery.net/${input.streamUid}/thumbnails/thumbnail.jpg`,
-      })
+      .update({ processing_status: "ready", thumbnail_url: thumbnailUrl })
       .eq("media_upload_id", row.id);
+
+    // Scan the first-frame thumbnail as a proxy for the full video.
+    // Full async video moderation (Rekognition Video API) requires the video
+    // to live in an S3 bucket and is deferred as a future enhancement.
+    const contentResult = await runContentScanFromUrl(admin, thumbnailUrl);
+    const { blocked } = await applyContentScanResult(admin, row, contentResult);
+
+    if (blocked) {
+      await admin
+        .from("media_uploads")
+        .update({ status: "rejected" })
+        .eq("id", row.id);
+      return;
+    }
 
     if (row.status === "scanning" && row.scan_status === "pending") {
       await applyVirusScanResult(admin, {

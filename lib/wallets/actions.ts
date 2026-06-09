@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { logger } from "@/lib/logger";
 import { resolveBankAccount } from "@/lib/paystack/banks";
+import { createTransferRecipient } from "@/lib/paystack/plans";
 import { requireAuth } from "@/lib/auth/get-auth-context";
 import {
   encryptAccountNumber,
@@ -91,6 +93,22 @@ export async function addPayoutAccount(
     return { success: false, error: error.message };
   }
 
+  // Create Paystack transfer recipient so payouts can be initiated immediately.
+  // Non-fatal: if this fails the account is still saved; admin can re-trigger.
+  try {
+    const recipientCode = await createTransferRecipient({
+      name: resolvedName,
+      accountNumber: parsed.data.account_number,
+      bankCode: parsed.data.bank_code,
+    });
+    await supabase
+      .from("payout_accounts")
+      .update({ paystack_recipient_code: recipientCode })
+      .eq("id", data.id);
+  } catch (err) {
+    logger.warn("paystack.recipient_create_failed", { err, accountId: data.id });
+  }
+
   revalidateWalletPaths();
   return { success: true, data: { id: data.id } };
 }
@@ -156,6 +174,45 @@ export async function requestWithdrawal(
       error:
         "Identity verification required before withdrawing. Please complete KYC in your profile settings.",
     };
+  }
+
+  const { data: cpRow } = await supabase
+    .from("creator_profiles")
+    .select("first_subscriber_paid_at")
+    .eq("user_id", auth.userId)
+    .single();
+
+  if (cpRow?.first_subscriber_paid_at) {
+    const holdUntil = new Date(
+      new Date(cpRow.first_subscriber_paid_at).getTime() +
+        14 * 24 * 60 * 60 * 1000,
+    );
+    if (holdUntil > new Date()) {
+      const daysLeft = Math.ceil(
+        (holdUntil.getTime() - Date.now()) / (24 * 60 * 60 * 1000),
+      );
+      try {
+        const { createAdminClient } = await import("@/lib/supabase/admin");
+        const admin = createAdminClient();
+        await writeAuditLog(admin, {
+          actorId: auth.userId,
+          actorType: "user",
+          action: "creator.payout_held",
+          entityType: "creator_profiles",
+          entityId: auth.userId,
+          metadata: {
+            hold_until: holdUntil.toISOString(),
+            days_remaining: daysLeft,
+          },
+        });
+      } catch {
+        // best-effort
+      }
+      return {
+        success: false,
+        error: `Your first withdrawal is on hold for ${daysLeft} more day${daysLeft === 1 ? "" : "s"} while we verify your account. This is a one-time security measure.`,
+      };
+    }
   }
 
   const wallet = await getCreatorWallet(supabase, auth.userId);

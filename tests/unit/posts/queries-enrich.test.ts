@@ -47,6 +47,13 @@ describe("enrichPosts", () => {
             }),
           };
         }
+        if (table === "post_polls") {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({ data: [] }),
+            }),
+          };
+        }
         return {};
       }),
       rpc: vi.fn((fn: string) => {

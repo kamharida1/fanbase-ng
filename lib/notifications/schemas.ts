@@ -18,6 +18,7 @@ const notificationTypeSchema = z.enum([
   "account_deletion",
   "gift_subscription",
   "missed_call",
+  "copyright_claim",
 ]);
 
 export const markReadSchema = z.object({
@@ -48,6 +49,7 @@ export const updatePreferencesSchema = z.object({
   account_deletion: z.boolean().optional(),
   gift_subscription: z.boolean().optional(),
   missed_call: z.boolean().optional(),
+  copyright_claim: z.boolean().optional(),
 });
 
 export const listNotificationsSchema = z.object({

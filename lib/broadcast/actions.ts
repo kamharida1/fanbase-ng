@@ -1,6 +1,7 @@
 "use server";
 
 import { requireAuth } from "@/lib/auth/get-auth-context";
+import { checkMessageSpam } from "@/lib/messaging/spam-filter";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -48,6 +49,9 @@ const LONGTIME_SUBSCRIBER_DAYS = 90;
 // Hard cap per send to avoid request timeouts.
 // Larger audiences need a background job queue (future work).
 const BROADCAST_CAP = 500;
+
+const MAX_BROADCASTS_PER_DAY = 3;
+const MIN_BROADCAST_INTERVAL_HOURS = 2;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyAudienceFilters(query: any, audience: BroadcastAudience | undefined) {
@@ -156,7 +160,45 @@ export async function sendBroadcast(input: {
     return { success: false, error: "Creator account required." };
   }
 
+  // Spam content check (URL density + identical body fingerprint)
+  const spamCheck = await checkMessageSpam(auth.userId, body);
+  if (!spamCheck.ok) {
+    return { success: false, error: spamCheck.reason };
+  }
+
   const admin = createAdminClient();
+
+  // Daily broadcast cap — query the DB for reliability across server instances
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count: todayCount } = await admin
+    .from("broadcasts")
+    .select("id", { count: "exact", head: true })
+    .eq("creator_id", auth.userId)
+    .gte("created_at", since24h);
+
+  if ((todayCount ?? 0) >= MAX_BROADCASTS_PER_DAY) {
+    return {
+      success: false,
+      error: `You can send at most ${MAX_BROADCASTS_PER_DAY} broadcasts per day. Try again tomorrow.`,
+    };
+  }
+
+  // Minimum cooldown between broadcasts
+  const sinceInterval = new Date(
+    Date.now() - MIN_BROADCAST_INTERVAL_HOURS * 60 * 60 * 1000,
+  ).toISOString();
+  const { count: recentCount } = await admin
+    .from("broadcasts")
+    .select("id", { count: "exact", head: true })
+    .eq("creator_id", auth.userId)
+    .gte("created_at", sinceInterval);
+
+  if ((recentCount ?? 0) > 0) {
+    return {
+      success: false,
+      error: `Please wait at least ${MIN_BROADCAST_INTERVAL_HOURS} hours between broadcasts.`,
+    };
+  }
 
   let planName: string | null = null;
   if (input.audience?.planId) {

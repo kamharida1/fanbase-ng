@@ -1,3 +1,5 @@
+import { UNSUBSCRIBE_PLACEHOLDER } from "@/lib/email/unsubscribe";
+
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://fanbaseng.com";
 const SETTINGS_URL = `${APP_URL}/settings`;
 
@@ -50,6 +52,8 @@ function shell(opts: {
               <p style="margin:0;font-size:12px;color:#999999;line-height:1.6;">
                 You received this because email notifications are enabled on your Fanbase NG account.
                 <a href="${SETTINGS_URL}" style="color:#999999;">Update preferences</a>
+                &nbsp;·&nbsp;
+                <a href="${UNSUBSCRIBE_PLACEHOLDER}" style="color:#999999;">Unsubscribe</a>
               </p>
             </td>
           </tr>
@@ -615,6 +619,68 @@ export function kycDecisionEmail(opts: {
         ${p("You can update your submission and reapply from your creator profile.")}
       `,
       cta: { label: "Reapply", url: `${APP_URL}/creator/profile` },
+    }),
+  };
+}
+
+export function copyrightClaimReceivedEmail(opts: {
+  creatorName: string;
+  postTitle: string;
+  claimId: string;
+  deadlineDate: string;
+}): { subject: string; html: string } {
+  return {
+    subject: "Copyright claim filed against one of your posts",
+    html: shell({
+      title: "Copyright claim received",
+      body: `
+        ${h1("A copyright claim has been filed")}
+        ${p(`Hi <strong>${opts.creatorName}</strong>,`)}
+        ${p(`A copyright infringement claim has been submitted for your post <strong>"${opts.postTitle}"</strong>.`)}
+        ${p(`You have until <strong>${opts.deadlineDate}</strong> to submit a counter-notice if you believe this claim is incorrect. If no counter-notice is received by this date, the post will be removed automatically.`)}
+        ${p('To submit a counter-notice, please go to your post settings and select "Dispute this claim." By submitting a counter-notice you confirm that you have the rights to publish this content.')}
+        ${p(`Claim reference: <code style="font-family:monospace;background:#f5f5f5;padding:2px 6px;border-radius:4px;">${opts.claimId}</code>`)}
+      `,
+      cta: { label: "View post settings", url: `${APP_URL}/creator/content` },
+    }),
+  };
+}
+
+export function copyrightAutoRemovedEmail(opts: {
+  creatorName: string;
+  postTitle: string;
+}): { subject: string; html: string } {
+  return {
+    subject: "Your post has been removed following a copyright claim",
+    html: shell({
+      title: "Post removed",
+      body: `
+        ${h1("Post removed: copyright claim")}
+        ${p(`Hi <strong>${opts.creatorName}</strong>,`)}
+        ${p(`Your post <strong>"${opts.postTitle}"</strong> has been removed because a copyright claim was filed and the counter-notice window has elapsed without a response.`)}
+        ${p("If you believe this was a mistake, please contact our support team with the claim reference number from the earlier notification.")}
+      `,
+      cta: { label: "Contact support", url: `${APP_URL}/help` },
+    }),
+  };
+}
+
+export function copyrightCounterNoticeAcknowledgedEmail(opts: {
+  claimantEmail: string;
+  postTitle: string;
+  counterBody: string;
+}): { subject: string; html: string } {
+  return {
+    subject: "Counter-notice received for your copyright claim",
+    html: shell({
+      title: "Counter-notice received",
+      body: `
+        ${h1("Counter-notice received")}
+        ${p(`A counter-notice has been submitted for the copyright claim you filed regarding <strong>"${opts.postTitle}"</strong>.`)}
+        ${p("Our team will review both the original claim and the counter-notice and reach a decision within 10 business days.")}
+        ${p(`Counter-notice statement: <em>"${opts.counterBody.slice(0, 500)}${opts.counterBody.length > 500 ? "…" : ""}"</em>`)}
+      `,
+      cta: { label: "Visit Fanbase NG", url: APP_URL },
     }),
   };
 }

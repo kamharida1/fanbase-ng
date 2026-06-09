@@ -34,6 +34,20 @@ export async function startTip(input: {
     return { success: false, error: "You cannot tip yourself." };
   }
 
+  const { data: fanProfile } = await supabase
+    .from("profiles")
+    .select("payment_suspended")
+    .eq("id", auth.userId)
+    .single();
+
+  if (fanProfile?.payment_suspended) {
+    return {
+      success: false,
+      error:
+        "Your payment capability has been suspended. Please contact support to resolve this.",
+    };
+  }
+
   const reference = buildPaymentReference().replace("fb_sub_", "fb_tip_");
   const callbackUrl = `${APP_URL}/creators/${encodeURIComponent(input.creatorUsername)}?tip=success&reference=${encodeURIComponent(reference)}`;
 

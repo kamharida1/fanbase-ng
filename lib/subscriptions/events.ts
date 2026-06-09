@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
+
 export async function logSubscriptionEvent(
   supabase: SupabaseClient,
   subscriptionId: string,
@@ -15,9 +17,6 @@ export async function logSubscriptionEvent(
   });
 
   if (error) {
-    console.error("[subscription_events]", error.message, {
-      subscriptionId,
-      eventType,
-    });
+    logger.warn("subscription_events.insert_failed", { err: error, subscriptionId, eventType });
   }
 }

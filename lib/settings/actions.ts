@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireAuth } from "@/lib/auth/get-auth-context";
+import { checkHandleForImpersonation } from "@/lib/auth/username-guard";
 import { createClient } from "@/lib/supabase/server";
 
 const updateProfileSchema = z.object({
@@ -27,6 +28,14 @@ export async function updateProfileAction(
 
   const supabase = await createClient();
   const auth = await requireAuth(supabase);
+
+  const guard = await checkHandleForImpersonation({
+    displayName: parsed.data.display_name,
+    excludeUserId: auth.userId,
+  });
+  if (!guard.ok) {
+    return { success: false, error: guard.reason };
+  }
 
   const { error } = await supabase
     .from("profiles")

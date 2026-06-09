@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import {
   cancelFanSubscription,
@@ -36,6 +37,7 @@ export function SubscriptionsManager({
     const result = await cancelFanSubscription({ subscriptionId });
     setLoadingId(null);
     if (!result.success) { setError(result.error); return; }
+    toast.success("Subscription cancelled.");
     router.refresh();
   }
 
@@ -45,6 +47,7 @@ export function SubscriptionsManager({
     const result = await pauseFanSubscription({ subscriptionId });
     setLoadingId(null);
     if (!result.success) { setError(result.error); return; }
+    toast.success("Subscription paused.");
     router.refresh();
   }
 
@@ -54,6 +57,7 @@ export function SubscriptionsManager({
     const result = await resumeFanSubscription({ subscriptionId });
     setLoadingId(null);
     if (!result.success) { setError(result.error); return; }
+    toast.success("Subscription resumed.");
     router.refresh();
   }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Send, Users } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   getAudienceCount,
@@ -81,6 +82,8 @@ export function BroadcastComposer({ creatorId }: { creatorId: string }) {
       return;
     }
 
+    const sent = res.data?.sentCount ?? 0;
+    toast.success(`Broadcast sent to ${sent.toLocaleString()} subscriber${sent !== 1 ? "s" : ""}.`);
     setResult(res.data ?? null);
     setBody("");
     setIsPpv(false);

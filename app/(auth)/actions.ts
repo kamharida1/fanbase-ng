@@ -9,6 +9,8 @@ import { getAuthContext } from "@/lib/auth/get-auth-context";
 import { canAccessPath } from "@/lib/auth/paths";
 import { insertUserSession } from "@/lib/auth/session";
 import { mapAuthError } from "@/lib/auth/errors";
+import { isDisposableEmail } from "@/lib/auth/disposable-domains";
+import { checkHandleForImpersonation } from "@/lib/auth/username-guard";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
@@ -87,6 +89,24 @@ export async function signUpWithEmail(input: {
     };
   }
 
+  if (isDisposableEmail(input.email)) {
+    return {
+      success: false,
+      error:
+        "Temporary or disposable email addresses are not allowed. Please use a permanent email address.",
+    };
+  }
+
+  if (input.username || input.displayName) {
+    const guard = await checkHandleForImpersonation({
+      username: input.username,
+      displayName: input.displayName,
+    });
+    if (!guard.ok) {
+      return { success: false, error: guard.reason };
+    }
+  }
+
   const supabase = await createClient();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const refPart = input.refCode
@@ -102,7 +122,7 @@ export async function signUpWithEmail(input: {
         username: input.username?.trim().toLowerCase() || undefined,
         date_of_birth: input.dateOfBirth,
       },
-      emailRedirectTo: `${appUrl}/callback?next=/feed${refPart}`,
+      emailRedirectTo: `${appUrl}/callback?next=/welcome${refPart}`,
     },
   });
 
@@ -200,7 +220,7 @@ export async function resendVerificationEmail(email: string) {
     type: "signup",
     email,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/callback?next=/feed`,
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/callback?next=/welcome`,
     },
   });
 

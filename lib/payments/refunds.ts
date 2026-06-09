@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { logger } from "@/lib/logger";
 import { asNumber, asRecord, asString } from "@/lib/paystack/parse";
 import { logSubscriptionEvent } from "@/lib/subscriptions/events";
 import { reverseCreatorPaymentCredit } from "@/lib/wallets/ledger";
@@ -51,7 +52,7 @@ export async function processRefundWebhook(
   );
 
   if (refundUpsertError) {
-    console.error("[payment_refunds]", refundUpsertError.message);
+    logger.error("refunds.upsert_failed", { err: refundUpsertError, paymentId: payment.id, refundStatus });
   }
 
   if (refundStatus === "failed") {

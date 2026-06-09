@@ -31,6 +31,14 @@
     {
       "path": "/api/internal/cron/process-account-deletions",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/internal/cron/purge-audit-logs",
+      "schedule": "0 2 1 * *"
+    },
+    {
+      "path": "/api/internal/cron/process-dmca-removals",
+      "schedule": "0 1 * * *"
     }
   ]
 }

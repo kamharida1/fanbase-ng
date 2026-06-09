@@ -5,6 +5,9 @@ import {
   accountDeletionEmail,
   accountStatusEmail,
   appealResolvedEmail,
+  copyrightAutoRemovedEmail,
+  copyrightClaimReceivedEmail,
+  copyrightCounterNoticeAcknowledgedEmail,
   creatorLiveEmail,
   giftSubscriptionEmail,
   kycDecisionEmail,
@@ -442,6 +445,25 @@ export async function notifyNewPayout(
   );
 }
 
+export async function notifyPayoutProcessed(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    payoutRequestId: string;
+  },
+): Promise<void> {
+  await createNotification(admin, {
+    userId: input.creatorId,
+    type: "new_payout",
+    title: "Payout sent",
+    body: "Your withdrawal has been sent to your bank account.",
+    actionUrl: buildAppActionUrl("/creator/withdrawals"),
+    entityType: "payout_requests",
+    entityId: input.payoutRequestId,
+    idempotencyKey: `payout:${input.payoutRequestId}:completed`,
+  });
+}
+
 export async function notifyPaymentDispute(
   admin: SupabaseClient,
   input: {
@@ -846,5 +868,102 @@ export async function notifyKycDecision(
       html,
     }),
     "account_status",
+  );
+}
+
+export async function notifyCopyrightClaim(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    creatorName: string;
+    postId: string;
+    postTitle: string;
+    claimId: string;
+    deadlineDate: string;
+  },
+): Promise<void> {
+  await createNotification(admin, {
+    userId: input.creatorId,
+    type: "copyright_claim",
+    title: "Copyright claim filed against your post",
+    body: `A copyright claim has been filed for "${input.postTitle}". You have until ${input.deadlineDate} to dispute it.`,
+    actionUrl: buildAppActionUrl("/creator/content"),
+    entityType: "copyright_claims",
+    entityId: input.claimId,
+    metadata: { post_id: input.postId, claim_id: input.claimId },
+    idempotencyKey: `copyright_claim:${input.claimId}`,
+  });
+
+  const { subject, html } = copyrightClaimReceivedEmail({
+    creatorName: input.creatorName,
+    postTitle: input.postTitle,
+    claimId: input.claimId,
+    deadlineDate: input.deadlineDate,
+  });
+  fireEmail(
+    sendEmailNotification(admin, {
+      userId: input.creatorId,
+      notificationType: "copyright_claim",
+      subject,
+      html,
+    }),
+    "copyright_claim",
+  );
+}
+
+export async function notifyCopyrightAutoRemoved(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    creatorName: string;
+    postTitle: string;
+    claimId: string;
+  },
+): Promise<void> {
+  await createNotification(admin, {
+    userId: input.creatorId,
+    type: "copyright_claim",
+    title: "Post removed: copyright claim",
+    body: `Your post "${input.postTitle}" was removed because a copyright claim was not disputed within the 14-day window.`,
+    actionUrl: buildAppActionUrl("/creator/content"),
+    entityType: "copyright_claims",
+    entityId: input.claimId,
+    metadata: { claim_id: input.claimId },
+    idempotencyKey: `copyright_auto_removed:${input.claimId}`,
+  });
+
+  const { subject, html } = copyrightAutoRemovedEmail({
+    creatorName: input.creatorName,
+    postTitle: input.postTitle,
+  });
+  fireEmail(
+    sendEmailNotification(admin, {
+      userId: input.creatorId,
+      notificationType: "copyright_claim",
+      subject,
+      html,
+    }),
+    "copyright_auto_removed",
+  );
+}
+
+export async function notifyCounterNoticeToClaimant(
+  _admin: SupabaseClient,
+  input: {
+    claimantEmail: string;
+    postTitle: string;
+    counterBody: string;
+  },
+): Promise<void> {
+  const { subject, html } = copyrightCounterNoticeAcknowledgedEmail({
+    claimantEmail: input.claimantEmail,
+    postTitle: input.postTitle,
+    counterBody: input.counterBody,
+  });
+  // Claimant may not be a platform user — send directly via email, no in-app row.
+  const { sendTransactionalEmail } = await import("@/lib/email/send");
+  fireEmail(
+    sendTransactionalEmail({ to: input.claimantEmail, subject, html }),
+    "counter_notice_claimant",
   );
 }

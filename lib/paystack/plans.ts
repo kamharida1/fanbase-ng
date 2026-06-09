@@ -49,3 +49,23 @@ export async function disablePaystackSubscription(
     },
   });
 }
+
+type TransferRecipient = { recipient_code: string };
+
+export async function createTransferRecipient(input: {
+  name: string;
+  accountNumber: string;
+  bankCode: string;
+}): Promise<string> {
+  const data = await paystackRequest<TransferRecipient>("/transferrecipient", {
+    method: "POST",
+    body: {
+      type: "nuban",
+      name: input.name,
+      account_number: input.accountNumber,
+      bank_code: input.bankCode,
+      currency: "NGN",
+    },
+  });
+  return data.recipient_code;
+}

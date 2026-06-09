@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Eye, EyeOff, Pin, PinOff, Trash2 } from "lucide-react";
 
+import { toast } from "sonner";
+
 import { addPostComment } from "@/lib/posts/actions";
 import {
   deleteComment,
@@ -73,6 +75,7 @@ export function CommentSection({
     const result = await addPostComment({ postId, body });
     setLoading(false);
     if (!result.success) { setError(result.error); return; }
+    toast.success("Comment posted.");
     setBody("");
     // Optimistically add placeholder; server refresh fills in author
     setComments((prev) => [

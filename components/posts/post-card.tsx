@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AlertTriangle, Heart, Lock, Pin, PinOff } from "lucide-react";
@@ -239,6 +240,10 @@ export function PostCard({
                 <Button size="sm" disabled={loading} onClick={() => void handleUnlock()}>
                   Unlock post
                 </Button>
+              ) : post.author?.username ? (
+                <Button size="sm" asChild>
+                  <Link href={`/creators/${post.author.username}`}>Subscribe to view</Link>
+                </Button>
               ) : null}
             </div>
           </div>
@@ -264,13 +269,14 @@ export function PostCard({
         <button
           type="button"
           disabled={loading || locked}
+          aria-label={`${liked ? "Unlike" : "Like"} post — ${likeCount} ${likeCount === 1 ? "like" : "likes"}`}
           onClick={() => void handleLike()}
           className={`inline-flex items-center gap-1.5 text-sm ${
             liked ? "text-red-600" : "text-muted-foreground"
           }`}
         >
-          <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />
-          {likeCount}
+          <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} aria-hidden />
+          <span aria-hidden>{likeCount}</span>
         </button>
         <span className="text-sm text-muted-foreground">
           {post.comment_count ?? 0} comments

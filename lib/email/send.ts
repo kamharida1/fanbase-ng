@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getFromAddress, getResendClient, REPLY_TO } from "@/lib/email/client";
+import { buildUnsubscribeUrl, UNSUBSCRIBE_PLACEHOLDER } from "@/lib/email/unsubscribe";
 import type { NotificationType } from "@/types/notifications";
 
 type SendInput = {
@@ -46,12 +47,17 @@ export async function sendEmailNotification(
   const typeEnabled = typePrefs[input.notificationType] ?? true;
   if (!typeEnabled) return;
 
+  const html = input.html.replaceAll(
+    UNSUBSCRIBE_PLACEHOLDER,
+    buildUnsubscribeUrl(input.userId),
+  );
+
   await resend.emails.send({
     from: getFromAddress(),
     to: email,
     replyTo: REPLY_TO,
     subject: input.subject,
-    html: input.html,
+    html,
   });
 }
 

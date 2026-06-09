@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { logger } from "@/lib/logger";
 import {
   asString,
   parseNestedSubscriptionCode,
@@ -60,6 +61,15 @@ export async function dispatchPaystackWebhook(
     case "subscription.disable":
     case "subscription.not_renew":
       await handleSubscriptionDisabled(admin, data, requestId);
+      return;
+
+    case "transfer.success":
+      await handleTransferSuccess(admin, data, requestId);
+      return;
+
+    case "transfer.failed":
+    case "transfer.reversed":
+      await handleTransferFailure(admin, data, event, requestId);
       return;
 
     default:
@@ -321,5 +331,108 @@ async function handleSubscriptionDisabled(
     entityId: sub.id,
     requestId,
     metadata: { paystack_subscription_code: subCode },
+  });
+}
+
+async function handleTransferSuccess(
+  admin: SupabaseClient,
+  data: Record<string, unknown>,
+  requestId?: string | null,
+): Promise<void> {
+  const transferCode = asString(data.transfer_code);
+  if (!transferCode) return;
+
+  const { data: payout, error } = await admin
+    .from("payout_requests")
+    .update({
+      status: "completed",
+      processed_at: new Date().toISOString(),
+    })
+    .eq("paystack_transfer_code", transferCode)
+    .eq("status", "processing") // idempotency: skip if already completed
+    .select("id, creator_id, net_amount_kobo")
+    .single();
+
+  if (error || !payout) return;
+
+  await writeAuditLog(admin, {
+    actorType: "paystack",
+    action: "wallet.payout_completed",
+    entityType: "payout_requests",
+    entityId: payout.id,
+    requestId,
+    metadata: { transfer_code: transferCode, net_kobo: payout.net_amount_kobo },
+  });
+
+  try {
+    const { notifyPayoutProcessed } = await import("@/lib/notifications/emit");
+    await notifyPayoutProcessed(admin, {
+      creatorId: payout.creator_id,
+      payoutRequestId: payout.id,
+    });
+  } catch (err) {
+    logger.warn("notifications.payout_completed_failed", { err, payoutId: payout.id });
+  }
+}
+
+async function handleTransferFailure(
+  admin: SupabaseClient,
+  data: Record<string, unknown>,
+  event: string,
+  requestId?: string | null,
+): Promise<void> {
+  const transferCode = asString(data.transfer_code);
+  if (!transferCode) return;
+
+  const failuresArr = Array.isArray(data.failures) ? data.failures : [];
+  const firstFailure = failuresArr[0] as Record<string, unknown> | undefined;
+  const failureReason =
+    asString(data.gateway_response) ??
+    asString(firstFailure?.reason) ??
+    event;
+
+  const { data: payout, error } = await admin
+    .from("payout_requests")
+    .update({
+      status: "failed",
+      failure_reason: failureReason.slice(0, 500),
+      processed_at: new Date().toISOString(),
+    })
+    .eq("paystack_transfer_code", transferCode)
+    .eq("status", "processing") // idempotency guard
+    .select("id, creator_id, wallet_id, net_amount_kobo")
+    .single();
+
+  if (error || !payout) return;
+
+  // Credit the net amount back to the creator's available balance so they
+  // can request another withdrawal. Done as a separate ledger transaction.
+  await admin.rpc("credit_wallet_on_payout_failure", {
+    p_wallet_id: payout.wallet_id,
+    p_amount_kobo: payout.net_amount_kobo,
+    p_payout_request_id: payout.id,
+  });
+
+  await writeAuditLog(admin, {
+    actorType: "paystack",
+    action: "wallet.payout_failed",
+    entityType: "payout_requests",
+    entityId: payout.id,
+    requestId,
+    metadata: {
+      transfer_code: transferCode,
+      event,
+      reason: failureReason,
+      net_kobo: payout.net_amount_kobo,
+    },
+  });
+
+  logger.error("payout.transfer_failed", {
+    payoutId: payout.id,
+    creatorId: payout.creator_id,
+    netKobo: payout.net_amount_kobo,
+    transferCode,
+    event,
+    reason: failureReason,
   });
 }

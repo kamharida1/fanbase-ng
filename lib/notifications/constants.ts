@@ -18,6 +18,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   account_deletion: "Account deletion updates",
   gift_subscription: "Gift subscriptions",
   missed_call: "Missed calls",
+  copyright_claim: "Copyright / DMCA takedown notices",
 };
 
 export const NOTIFICATION_TYPES: NotificationType[] = [
@@ -38,6 +39,7 @@ export const NOTIFICATION_TYPES: NotificationType[] = [
   "account_deletion",
   "gift_subscription",
   "missed_call",
+  "copyright_claim",
 ];
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: Record<
@@ -61,6 +63,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: Record<
   account_deletion: true,
   gift_subscription: true,
   missed_call: true,
+  copyright_claim: true,
 };
 
 export const NOTIFICATIONS_PAGE_SIZE = 25;

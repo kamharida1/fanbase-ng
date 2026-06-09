@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 import { disablePaystackSubscription } from "@/lib/paystack/plans";
 import { logSubscriptionEvent } from "@/lib/subscriptions/events";
 import { addPeriod, extendPeriod, pastDueGraceEnds } from "@/lib/subscriptions/period";
@@ -135,7 +136,7 @@ export async function activateSubscription(
       planName: input.plan.name,
     });
   } catch (err) {
-    console.error("[notifications] new subscriber", err);
+    logger.warn("notifications.new_subscriber_failed", { err, subscriptionId: data.id });
   }
 
   return { subscriptionId: data.id };
@@ -215,7 +216,7 @@ export async function cancelSubscriptionAtPeriodEnd(
     try {
       await disablePaystackSubscription(sub.paystack_subscription_code);
     } catch (err) {
-      console.error("[paystack] disable subscription failed", err);
+      logger.warn("paystack.disable_subscription_failed", { err, subscriptionId });
     }
   }
 
@@ -305,11 +306,15 @@ export async function expireEndedSubscriptions(
     .eq("cancel_at_period_end", false);
 
   for (const row of dueRows ?? []) {
-    const { error } = await supabase
+    // Optimistic lock: only update (and log) if status hasn't already changed
+    // — prevents duplicate events when two cron instances run concurrently.
+    const { data: updated, error } = await supabase
       .from("subscriptions")
       .update({ status: "past_due" })
-      .eq("id", row.id);
-    if (!error) {
+      .eq("id", row.id)
+      .in("status", ["active", "trialing"])
+      .select("id");
+    if (!error && updated && updated.length > 0) {
       pastDue += 1;
       await logSubscriptionEvent(supabase, row.id, "past_due", {});
     }
@@ -323,14 +328,16 @@ export async function expireEndedSubscriptions(
     .lt("current_period_end", nowIso);
 
   for (const row of cancelRows ?? []) {
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("subscriptions")
       .update({
         status: "expired",
         ended_at: nowIso,
       })
-      .eq("id", row.id);
-    if (!error) {
+      .eq("id", row.id)
+      .in("status", ["active", "trialing", "past_due"])
+      .select("id");
+    if (!error && updated && updated.length > 0) {
       expired += 1;
       await logSubscriptionEvent(supabase, row.id, "expired", {
         reason: "cancel_at_period_end",
@@ -348,15 +355,17 @@ export async function expireEndedSubscriptions(
     const graceEnd = pastDueGraceEnds(new Date(row.current_period_end));
     if (graceEnd.getTime() > Date.now()) continue;
 
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("subscriptions")
       .update({
         status: "expired",
         ended_at: nowIso,
       })
-      .eq("id", row.id);
+      .eq("id", row.id)
+      .eq("status", "past_due")
+      .select("id");
 
-    if (!error) {
+    if (!error && updated && updated.length > 0) {
       expired += 1;
       await logSubscriptionEvent(supabase, row.id, "expired", {
         reason: "past_due_grace_elapsed",
@@ -380,7 +389,7 @@ export async function expireEndedSubscriptions(
           planName: planName ?? "your plan",
         });
       } catch (err) {
-        console.error("[notifications] subscription ended (non-payment)", err);
+        logger.warn("notifications.subscription_ended_failed", { err, subscriptionId: row.id });
       }
     }
   }

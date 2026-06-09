@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAuth } from "@/lib/auth/get-auth-context";
+import { getAccountAge } from "@/lib/auth/account-age";
 import {
   canFanMessageCreator,
   canSendMessageInConversation,
@@ -13,8 +14,10 @@ import {
   sendMessageSchema,
   startConversationSchema,
 } from "@/lib/messaging/schemas";
+import { checkMessageSpam } from "@/lib/messaging/spam-filter";
 import { bindUploadToMessage } from "@/lib/media/bind";
 import { uploadMessageAttachment } from "@/lib/messaging/storage";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { MediaUploadRow } from "@/types/media";
@@ -49,6 +52,40 @@ export async function startConversationWithCreator(
   );
   if (!allowed) {
     return { success: false, error: "Creator not found." };
+  }
+
+  // New accounts (< 24h) may only initiate conversations with creators they subscribe to.
+  const { isNew } = await getAccountAge(supabase, auth.userId);
+  if (isNew) {
+    const { count } = await supabase
+      .from("subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("fan_id", auth.userId)
+      .eq("creator_id", parsed.data.creatorId)
+      .eq("status", "active");
+
+    if ((count ?? 0) === 0) {
+      return {
+        success: false,
+        error:
+          "New accounts can only message creators you're subscribed to. Subscribe first, then reach out.",
+      };
+    }
+  }
+
+  // Rate limit new conversation starts — prevents a fan from bulk-initiating
+  // threads with many creators in a short window.
+  const convStartRl = await checkRateLimit(
+    `conversationStart:${auth.userId}`,
+    isNew
+      ? RATE_LIMITS.conversationStartNewAccount
+      : RATE_LIMITS.conversationStart,
+  );
+  if (!convStartRl.ok) {
+    return {
+      success: false,
+      error: `You're starting conversations too quickly. Try again in ${convStartRl.retryAfterSeconds}s.`,
+    };
   }
 
   const { data, error } = await supabase.rpc("get_or_create_conversation", {
@@ -108,6 +145,25 @@ export async function sendMessage(
     return { success: false, error: sendCheck.reason ?? "Cannot send message." };
   }
 
+  // Hourly send rate limit — tighter cap for accounts < 24 hours old.
+  const { isNew: senderIsNew } = await getAccountAge(supabase, auth.userId);
+  const msgRl = await checkRateLimit(
+    `messageSend:${auth.userId}`,
+    senderIsNew ? RATE_LIMITS.messageSendNewAccount : RATE_LIMITS.messageSend,
+  );
+  if (!msgRl.ok) {
+    return {
+      success: false,
+      error: `You're sending messages too quickly. Try again in ${msgRl.retryAfterSeconds}s.`,
+    };
+  }
+
+  // Spam content filter — URL density and identical-body fingerprint
+  const spamCheck = await checkMessageSpam(auth.userId, parsed.data.body);
+  if (!spamCheck.ok) {
+    return { success: false, error: spamCheck.reason };
+  }
+
   const createdAt = new Date().toISOString();
 
   let mediaR2Key = parsed.data.attachmentPath ?? null;
@@ -159,6 +215,7 @@ export async function sendMessage(
       attachment_mime: attachmentMime,
       attachment_filename: attachmentFilename,
       attachment_size_bytes: attachmentSizeBytes,
+      idempotency_key: parsed.data.idempotencyKey ?? null,
       created_at: createdAt,
     })
     .select("id, created_at")

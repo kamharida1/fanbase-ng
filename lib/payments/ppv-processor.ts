@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { logger } from "@/lib/logger";
 import { chargeAmountMatchesPayment } from "@/lib/security/payment-amount";
 import { creditCreatorFromPayment } from "@/lib/wallets/ledger";
 
@@ -122,7 +123,13 @@ export async function fulfillPpvPurchase(
       description: "PPV unlock",
     });
   } catch (err) {
-    console.error("[wallet] ppv credit", err);
+    logger.error("wallet.ppv_credit_failed", {
+      err,
+      paymentId,
+      creatorId: meta.creator_id,
+      grossKobo: amount,
+      idempotencyKey: `payment:${paymentId}:credit`,
+    });
   }
 
   await writeAuditLog(admin, {

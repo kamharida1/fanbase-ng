@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { sendWeeklyDigest } from "@/lib/email/digest";
+import { logger } from "@/lib/logger";
 import { verifyCronBearer } from "@/lib/security/cron-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const startMs = Date.now();
   const admin = createAdminClient();
   const dueBefore = new Date(Date.now() - DUE_AFTER_DAYS * MS_DAY).toISOString();
 
@@ -50,9 +52,10 @@ export async function POST(request: Request) {
 
       if (delivered) sent += 1;
     } catch (err) {
-      console.error("[email-digests]", userId, err);
+      logger.warn("cron.email_digest_failed", { err, userId });
     }
   }
 
+  logger.info("cron.email_digests_completed", { candidates: candidates?.length ?? 0, sent, durationMs: Date.now() - startMs });
   return NextResponse.json({ ok: true, candidates: candidates?.length ?? 0, sent });
 }

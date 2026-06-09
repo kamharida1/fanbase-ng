@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { CreatorCard } from "@/components/creator/creator-card";
 import { PostCard } from "@/components/posts/post-card";
+import { SuggestedCreators } from "@/components/recommendations/suggested-creators";
 import { EmptyState } from "@/components/shared/empty-state";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
 import { CREATOR_CATEGORIES } from "@/lib/creators/categories";
@@ -12,6 +13,7 @@ import {
   listTrendingPosts,
   searchPosts,
 } from "@/lib/posts/queries";
+import { getRecommendedCreators } from "@/lib/recommendations/queries";
 import { createClient } from "@/lib/supabase/server";
 
 type PageProps = {
@@ -149,11 +151,21 @@ export default async function DiscoverPage({ searchParams }: PageProps) {
     );
   }
 
-  const creators = await listCreators(supabase, {
-    limit: 24,
-    search: q?.trim() || undefined,
-    category: cat || undefined,
-  });
+  const auth = await getAuthContext(supabase);
+  const viewerId = auth?.userId ?? null;
+
+  const isFiltering = Boolean(q?.trim() || cat);
+
+  const [creators, suggestedCreators] = await Promise.all([
+    listCreators(supabase, {
+      limit: 24,
+      search: q?.trim() || undefined,
+      category: cat || undefined,
+    }),
+    viewerId && !isFiltering
+      ? getRecommendedCreators(supabase, viewerId, 8)
+      : Promise.resolve([]),
+  ]);
 
   const activeCategory = CREATOR_CATEGORIES.find((c) => c.value === cat);
 
@@ -234,6 +246,13 @@ export default async function DiscoverPage({ searchParams }: PageProps) {
         </div>
       </div>
 
+      {/* ── Suggested creators ─────────────────────────────────────── */}
+      {suggestedCreators.length > 0 ? (
+        <div className="mt-8">
+          <SuggestedCreators creators={suggestedCreators} />
+        </div>
+      ) : null}
+
       {/* ── Results ────────────────────────────────────────────────── */}
       {creators.length === 0 ? (
         <div className="mt-8">
@@ -262,7 +281,10 @@ export default async function DiscoverPage({ searchParams }: PageProps) {
         </div>
       ) : (
         <>
-          <p className="mt-6 text-sm text-muted-foreground">
+          {suggestedCreators.length > 0 ? (
+            <h2 className="mt-8 text-lg font-semibold">All creators</h2>
+          ) : null}
+          <p className="mt-2 text-sm text-muted-foreground">
             {creators.length} creator{creators.length !== 1 ? "s" : ""}
             {activeCategory ? ` in ${activeCategory.label}` : ""}
             {q ? ` matching "${q}"` : ""}

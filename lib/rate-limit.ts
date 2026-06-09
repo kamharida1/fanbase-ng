@@ -126,4 +126,13 @@ export const RATE_LIMITS = {
   authSignup: { limit: 5, windowSeconds: 60 },
   // Paystack webhook: protect against flood before HMAC check
   paystackWebhook: { limit: 60, windowSeconds: 60 },
+  // Messaging: per-user hourly caps (new accounts get a tighter cap applied in code)
+  messageSend: { limit: 60, windowSeconds: 3600 },
+  messageSendNewAccount: { limit: 10, windowSeconds: 3600 },
+  // Post creation: prevent content flooding
+  postCreate: { limit: 20, windowSeconds: 3600 },
+  postCreateNewAccount: { limit: 3, windowSeconds: 3600 },
+  // Conversation initiation: prevent fan from spamming many creators
+  conversationStart: { limit: 5, windowSeconds: 3600 },
+  conversationStartNewAccount: { limit: 2, windowSeconds: 3600 },
 } as const;

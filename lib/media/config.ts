@@ -55,3 +55,30 @@ export function isR2Configured(): boolean {
 export function isStreamConfigured(): boolean {
   return getStreamConfig() !== null;
 }
+
+// ── Content moderation (CSAM / explicit content) ──────────────────────────
+
+export type RekognitionConfig = {
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+};
+
+/**
+ * off       — no content scanning (development / opted-out)
+ * hash-only — SHA-256 exact match against content_violation_hashes only
+ * full      — hash check + AWS Rekognition DetectModerationLabels
+ */
+export function getContentScanMode(): "off" | "hash-only" | "full" {
+  const mode = process.env.CONTENT_SCAN_MODE?.toLowerCase();
+  if (mode === "off" || mode === "hash-only" || mode === "full") return mode;
+  return process.env.NODE_ENV === "production" ? "hash-only" : "off";
+}
+
+export function getRekognitionConfig(): RekognitionConfig | null {
+  const region = process.env.AWS_REKOGNITION_REGION;
+  const accessKeyId = process.env.AWS_REKOGNITION_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_REKOGNITION_SECRET_ACCESS_KEY;
+  if (!region || !accessKeyId || !secretAccessKey) return null;
+  return { region, accessKeyId, secretAccessKey };
+}

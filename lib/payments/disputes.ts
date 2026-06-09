@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { logger } from "@/lib/logger";
 import { asNumber, asRecord, asString } from "@/lib/paystack/parse";
+import { compileDisputeEvidence } from "@/lib/payments/evidence";
 import { notifyPaymentDispute } from "@/lib/notifications/emit";
 import { logSubscriptionEvent } from "@/lib/subscriptions/events";
 import {
@@ -9,6 +11,8 @@ import {
   holdCreatorPaymentForDispute,
   releaseDisputeHold,
 } from "@/lib/wallets/ledger";
+
+const CHARGEBACK_SUSPEND_THRESHOLD = 2;
 
 // Paystack's `resolution` values on `charge.dispute.resolve`. We only act
 // automatically on unambiguous outcomes; anything else is left `open` for an
@@ -69,7 +73,7 @@ export async function processDisputeWebhook(
       .single();
 
     if (insertError || !created) {
-      console.error("[disputes]", insertError?.message);
+      logger.error("disputes.insert_failed", { err: insertError, paymentId: payment.id, event: input.event });
       return;
     }
 
@@ -117,6 +121,16 @@ export async function processDisputeWebhook(
         amountKobo: amount ?? payment.amount_kobo,
       });
     }
+
+    // Compile evidence snapshot asynchronously — never blocks the webhook response.
+    compileDisputeEvidence(admin, {
+      disputeId: created.id,
+      fanId: payment.payer_id,
+      creatorId: payment.creator_id,
+      paymentId: payment.id,
+    }).catch((err) =>
+      logger.warn("disputes.evidence_compile_error", { err, disputeId: created.id }),
+    );
 
     return;
   }
@@ -224,6 +238,68 @@ export async function resolveDispute(
       requestId: input.requestId,
       metadata: { dispute_id: input.disputeId, payment_id: input.paymentId },
     });
+  }
+
+  // Serial chargeback enforcement: increment loss count and suspend payer if
+  // they hit the threshold. We do this after the wallet is settled so the
+  // suspension doesn't interfere with the financial resolution.
+  if (input.outcome === "lost" && input.fanId) {
+    try {
+      const { data: fanRow } = await admin
+        .from("profiles")
+        .select("chargeback_loss_count, payment_suspended")
+        .eq("id", input.fanId)
+        .single();
+
+      const newCount = (fanRow?.chargeback_loss_count ?? 0) + 1;
+      const shouldSuspend =
+        !fanRow?.payment_suspended && newCount >= CHARGEBACK_SUSPEND_THRESHOLD;
+      const now = new Date().toISOString();
+
+      await admin
+        .from("profiles")
+        .update({
+          chargeback_loss_count: newCount,
+          ...(shouldSuspend
+            ? { payment_suspended: true, payment_suspended_at: now }
+            : {}),
+        })
+        .eq("id", input.fanId);
+
+      await writeAuditLog(admin, {
+        actorId: input.fanId,
+        actorType: "system",
+        action: "payment.chargeback_loss_recorded",
+        entityType: "profiles",
+        entityId: input.fanId,
+        metadata: {
+          dispute_id: input.disputeId,
+          chargeback_loss_count: newCount,
+          payment_suspended: shouldSuspend,
+        },
+      });
+
+      if (shouldSuspend) {
+        await writeAuditLog(admin, {
+          actorId: input.fanId,
+          actorType: "system",
+          action: "account.payment_suspended",
+          entityType: "profiles",
+          entityId: input.fanId,
+          metadata: {
+            reason: "chargeback_threshold_reached",
+            threshold: CHARGEBACK_SUSPEND_THRESHOLD,
+            chargeback_loss_count: newCount,
+          },
+        });
+      }
+    } catch (err) {
+      logger.warn("disputes.chargeback_risk_update_failed", {
+        err,
+        fanId: input.fanId,
+        disputeId: input.disputeId,
+      });
+    }
   }
 
   if (input.outcome === "lost" && input.subscriptionId) {

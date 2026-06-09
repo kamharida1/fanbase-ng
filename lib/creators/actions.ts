@@ -13,6 +13,7 @@ import type { PlanBillingInterval } from "@/types/subscription";
 import { uploadProfileImage } from "@/lib/creators/storage";
 import { normalizeSocialLinks } from "@/lib/creators/format";
 import { requireAuth } from "@/lib/auth/get-auth-context";
+import { checkHandleForImpersonation } from "@/lib/auth/username-guard";
 import { createClient } from "@/lib/supabase/server";
 
 export type ActionResult<T = void> =
@@ -74,6 +75,15 @@ export async function updateProfileBasics(
 
   const supabase = await createClient();
   const auth = await requireAuth(supabase);
+
+  const guard = await checkHandleForImpersonation({
+    username: parsed.data.username,
+    displayName: parsed.data.display_name,
+    excludeUserId: auth.userId,
+  });
+  if (!guard.ok) {
+    return { success: false, error: guard.reason };
+  }
 
   const { error } = await supabase
     .from("profiles")

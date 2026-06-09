@@ -31,6 +31,20 @@ export async function startPpvPurchase(postId: string): Promise<PpvCheckoutResul
     return { success: false, error: "You already unlocked this post." };
   }
 
+  const { data: fanProfile } = await supabase
+    .from("profiles")
+    .select("payment_suspended")
+    .eq("id", auth.userId)
+    .single();
+
+  if (fanProfile?.payment_suspended) {
+    return {
+      success: false,
+      error:
+        "Your payment capability has been suspended. Please contact support to resolve this.",
+    };
+  }
+
   const reference = buildPaymentReference().replace("fb_sub_", "fb_ppv_");
   const callbackUrl = `${APP_URL}/feed?ppv=success&reference=${encodeURIComponent(reference)}`;
 

@@ -1,9 +1,11 @@
 import { HomeFeed } from "@/components/feed/home-feed";
+import { SuggestedCreators } from "@/components/recommendations/suggested-creators";
 import { StoryStrip } from "@/components/feed/story-strip";
 import { VerifyCheckout } from "@/components/subscriptions/verify-checkout";
 import { FEED_PAGE_SIZE } from "@/lib/feed/constants";
 import { FeedUnavailableError } from "@/lib/feed/errors";
 import { getHomeFeedPage } from "@/lib/feed/queries";
+import { getRecommendedCreators } from "@/lib/recommendations/queries";
 import { getStoryGroups } from "@/lib/stories/queries";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
 import { buildWatermarkLabel } from "@/lib/media/watermark";
@@ -25,7 +27,7 @@ export default async function FeedPage({ searchParams }: PageProps) {
     userId: auth.userId,
   });
 
-  const [storyGroups, page] = await Promise.all([
+  const [storyGroups, page, suggestedCreators] = await Promise.all([
     getStoryGroups(supabase, auth.userId),
     (async () => {
       try {
@@ -41,6 +43,7 @@ export default async function FeedPage({ searchParams }: PageProps) {
         throw err;
       }
     })(),
+    getRecommendedCreators(supabase, auth.userId, 8),
   ]);
 
   return (
@@ -60,6 +63,13 @@ export default async function FeedPage({ searchParams }: PageProps) {
 
       {storyGroups.length > 0 ? (
         <StoryStrip groups={storyGroups} />
+      ) : null}
+
+      {suggestedCreators.length > 0 ? (
+        <SuggestedCreators
+          creators={suggestedCreators}
+          heading="Creators you might like"
+        />
       ) : null}
 
       <HomeFeed

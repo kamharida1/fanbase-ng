@@ -18,6 +18,9 @@ export type MediaScanStatus =
   | "skipped"
   | "error";
 
+export type ContentScanStatus = "pending" | "clean" | "flagged" | "blocked" | "skipped" | "error";
+export type ContentScanAction = "allow" | "review" | "block";
+
 export type MediaUploadRow = {
   id: string;
   owner_id: string;
@@ -33,6 +36,11 @@ export type MediaUploadRow = {
   scan_status: MediaScanStatus;
   scan_provider: string | null;
   scan_result: Record<string, unknown>;
+  content_scan_status: ContentScanStatus;
+  content_scan_action: ContentScanAction | null;
+  content_scan_labels: Array<{ name: string; confidence: number; action: string }>;
+  content_scan_sha256: string | null;
+  content_scan_completed_at: string | null;
   bound_entity_type: string | null;
   bound_entity_id: string | null;
   expires_at: string;
