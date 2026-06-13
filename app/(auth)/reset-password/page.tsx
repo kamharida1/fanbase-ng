@@ -8,7 +8,7 @@ export default function ResetPasswordPage() {
       <div className="text-center">
         <h1 className="text-2xl font-bold">Choose a new password</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Must be at least 8 characters
+          Enter the 6-digit code we emailed you and your new password (at least 8 characters)
         </p>
       </div>
       <Suspense

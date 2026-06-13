@@ -101,7 +101,9 @@ export function SignupForm() {
         return;
       }
 
-      router.push("/verify?message=verify_email");
+      router.push(
+        `/verify?message=verify_email&email=${encodeURIComponent(email.trim().toLowerCase())}`,
+      );
       router.refresh();
     } catch {
       setError("Something went wrong while creating your account. Please try again.");

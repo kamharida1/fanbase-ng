@@ -28,7 +28,9 @@ export function ForgotPasswordForm() {
       return;
     }
 
-    router.push("/login?message=check_email_reset");
+    router.push(
+      `/reset-password?email=${encodeURIComponent(email.trim().toLowerCase())}`,
+    );
   }
 
   return (
@@ -50,7 +52,7 @@ export function ForgotPasswordForm() {
         </p>
       ) : null}
       <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? "Sending…" : "Send reset link"}
+        {loading ? "Sending…" : "Send reset code"}
       </Button>
       <p className="text-center text-sm">
         <Link href="/login" className="font-medium underline">

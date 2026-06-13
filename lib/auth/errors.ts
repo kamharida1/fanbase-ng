@@ -26,6 +26,12 @@ export function mapAuthError(message: string): string {
   if (lower.includes("signup is disabled")) {
     return "Registration is temporarily unavailable.";
   }
+  if (lower.includes("token has expired") || lower.includes("otp_expired")) {
+    return "This code has expired. Request a new one and try again.";
+  }
+  if (lower.includes("token") && lower.includes("invalid")) {
+    return "That code is incorrect. Check your email and try again.";
+  }
 
   return message;
 }

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { AuthAlert } from "@/components/auth/auth-alert";
 import { ResendVerificationForm } from "@/components/auth/resend-verification-form";
+import { VerifyOtpForm } from "@/components/auth/verify-otp-form";
 
 export default function VerifyPage() {
   return (
@@ -12,8 +13,11 @@ export default function VerifyPage() {
         <AuthAlert />
       </Suspense>
       <p className="text-sm text-muted-foreground">
-        Click the link in your inbox to activate your account, then sign in.
+        Enter the 6-digit code we emailed you to activate your account.
       </p>
+      <Suspense fallback={null}>
+        <VerifyOtpForm />
+      </Suspense>
       <ResendVerificationForm />
       <Link href="/login" className="text-sm font-medium underline">
         Back to sign in
