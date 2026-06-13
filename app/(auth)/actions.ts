@@ -63,6 +63,74 @@ export async function signInWithEmail(
   return { success: true };
 }
 
+/** Sign in, record session, and resolve redirect in one request so auth cookies are available. */
+export async function signInAndRedirect(
+  email: string,
+  password: string,
+  next?: string | null,
+  userAgent?: string,
+): Promise<
+  | { success: true; redirectTo: string }
+  | { success: false; error: string; retryAfter?: number }
+> {
+  const ip = await getIp();
+  const key = `authLogin:${email.trim().toLowerCase()}:${ip}`;
+  const rl = await checkRateLimit(key, RATE_LIMITS.authLogin);
+  if (!rl.ok) {
+    return {
+      success: false,
+      error: `Too many login attempts. Try again in ${rl.retryAfterSeconds}s.`,
+      retryAfter: rl.retryAfterSeconds,
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
+
+  if (error) {
+    return { success: false, error: mapAuthError(error.message) };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error: "Sign-in succeeded but the session could not be established. Please try again.",
+    };
+  }
+
+  const headerStore = await headers();
+  const forwarded = headerStore.get("x-forwarded-for");
+  const sessionIp = forwarded?.split(",")[0]?.trim() ?? null;
+
+  await insertUserSession(supabase, user.id, {
+    userAgent: userAgent ?? headerStore.get("user-agent"),
+    ipAddress: sessionIp,
+  });
+
+  const ctx = await getAuthContext(supabase);
+  if (!ctx) {
+    return {
+      success: false,
+      error: "Your account profile could not be loaded. Contact support if this persists.",
+    };
+  }
+
+  const safeNext = sanitizeNextPath(next);
+  const redirectTo =
+    safeNext && canAccessPath(safeNext, ctx.appRole)
+      ? safeNext
+      : getDefaultPathForRole(ctx.appRole);
+
+  return { success: true, redirectTo };
+}
+
 export async function signUpWithEmail(input: {
   email: string;
   password: string;

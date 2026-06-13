@@ -4,11 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import {
-  recordSession,
-  resolvePostLoginPath,
-  signInWithEmail,
-} from "@/app/(auth)/actions";
+import { signInAndRedirect } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,19 +25,19 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      const result = await signInWithEmail(email, password);
+      const result = await signInAndRedirect(
+        email,
+        password,
+        next,
+        typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      );
 
       if (!result.success) {
         setError(result.error);
         return;
       }
 
-      await recordSession(
-        typeof navigator !== "undefined" ? navigator.userAgent : undefined,
-      );
-
-      const dest = await resolvePostLoginPath(next);
-      router.push(dest);
+      router.push(result.redirectTo);
       router.refresh();
     } catch {
       setError("Something went wrong while signing in. Please try again.");
