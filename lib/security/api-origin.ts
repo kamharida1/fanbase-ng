@@ -37,14 +37,14 @@ export function verifyApiMutationOrigin(request: Request): boolean {
     return false;
   }
 
-  const allowed = allowedOrigins();
-  if (allowed.size > 0) {
-    return allowed.has(originUrl.origin);
+  // Same-origin requests (the normal case for browser fetches from our own
+  // pages) are always allowed — checked first so this works for any custom
+  // domain pointed at this deployment, regardless of NEXT_PUBLIC_APP_URL.
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const requestHost = host?.split(",")[0]?.trim().toLowerCase();
+  if (requestHost && originUrl.host.toLowerCase() === requestHost) {
+    return true;
   }
 
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  if (!host) return false;
-
-  const requestHost = host.split(",")[0]?.trim().toLowerCase();
-  return originUrl.host.toLowerCase() === requestHost;
+  return allowedOrigins().has(originUrl.origin);
 }
