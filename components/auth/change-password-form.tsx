@@ -5,8 +5,8 @@ import { useState } from "react";
 
 import { updatePassword } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/constants";
 import { mapAuthError } from "@/lib/auth/errors";
 
@@ -76,9 +76,8 @@ export function ChangePasswordForm() {
     <form onSubmit={onSubmit} className="max-w-md space-y-4">
       <div className="space-y-2">
         <Label htmlFor="currentPassword">Current password</Label>
-        <Input
+        <PasswordInput
           id="currentPassword"
-          type="password"
           autoComplete="current-password"
           required
           value={currentPassword}
@@ -87,9 +86,8 @@ export function ChangePasswordForm() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="newPassword">New password</Label>
-        <Input
+        <PasswordInput
           id="newPassword"
-          type="password"
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN_LENGTH}
@@ -99,9 +97,8 @@ export function ChangePasswordForm() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="confirmNew">Confirm new password</Label>
-        <Input
+        <PasswordInput
           id="confirmNew"
-          type="password"
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN_LENGTH}

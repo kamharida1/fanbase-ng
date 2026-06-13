@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/constants";
 import { mapAuthError } from "@/lib/auth/errors";
 import { createClient } from "@/lib/supabase/client";
@@ -90,9 +90,8 @@ export function ResetPasswordForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="password">New password</Label>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN_LENGTH}
@@ -102,9 +101,8 @@ export function ResetPasswordForm() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="confirm">Confirm password</Label>
-        <Input
+        <PasswordInput
           id="confirm"
-          type="password"
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN_LENGTH}

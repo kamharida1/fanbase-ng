@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { PASSWORD_MIN_LENGTH, USERNAME_PATTERN } from "@/lib/auth/constants";
 
 // Latest DOB that still makes someone 18 today
@@ -146,9 +147,8 @@ export function SignupForm() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN_LENGTH}
@@ -158,9 +158,8 @@ export function SignupForm() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="confirmPassword">Confirm password</Label>
-        <Input
+        <PasswordInput
           id="confirmPassword"
-          type="password"
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN_LENGTH}
