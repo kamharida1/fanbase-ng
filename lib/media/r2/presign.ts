@@ -16,7 +16,6 @@ export async function createR2PresignedPut(input: {
     Bucket: bucket,
     Key: input.objectKey,
     ContentType: input.mimeType,
-    ContentLength: input.byteSize,
   });
 
   const uploadUrl = await getSignedUrl(client, command, {
@@ -29,7 +28,6 @@ export async function createR2PresignedPut(input: {
     uploadUrl,
     headers: {
       "Content-Type": input.mimeType,
-      "Content-Length": String(input.byteSize),
     },
     expiresAt,
   };

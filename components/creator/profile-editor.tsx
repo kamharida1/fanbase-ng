@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { uploadFileWithPresign } from "@/lib/media/client-upload";
 import {
@@ -36,6 +36,8 @@ export function ProfileEditor({
   creator,
 }: ProfileEditorProps) {
   const router = useRouter();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState(initialDisplayName);
   const [username, setUsername] = useState(initialUsername);
   const [bio, setBio] = useState(creator?.bio ?? "");
@@ -174,15 +176,24 @@ export function ProfileEditor({
           />
         ) : null}
         <input
+          ref={avatarInputRef}
           type="file"
           accept="image/jpeg,image/png,image/webp"
-          className="text-sm"
+          className="hidden"
           disabled={loading}
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) void handleUpload("avatar", file);
           }}
         />
+        <Button
+          type="button"
+          variant="outline"
+          disabled={loading}
+          onClick={() => avatarInputRef.current?.click()}
+        >
+          Choose file
+        </Button>
       </section>
 
       {creator ? (
@@ -198,15 +209,24 @@ export function ProfileEditor({
               />
             ) : null}
             <input
+              ref={bannerInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              className="text-sm"
+              className="hidden"
               disabled={loading}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) void handleUpload("banner", file);
               }}
             />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading}
+              onClick={() => bannerInputRef.current?.click()}
+            >
+              Choose file
+            </Button>
           </section>
 
           <section className="space-y-4">
