@@ -121,9 +121,10 @@ export const RATE_LIMITS = {
   mediaDelivery: { limit: 120, windowSeconds: 60 },
   paymentVerify: { limit: 10, windowSeconds: 60 },
   creatorsPublic: { limit: 60, windowSeconds: 60 },
-  // Auth: tight limits to block credential stuffing
-  authLogin: { limit: 10, windowSeconds: 60 },
-  authSignup: { limit: 5, windowSeconds: 60 },
+  // Auth: generous limits so real users never get blocked, while still
+  // capping automated credential stuffing / signup spam.
+  authLogin: { limit: 30, windowSeconds: 60 },
+  authSignup: { limit: 15, windowSeconds: 60 },
   // Paystack webhook: protect against flood before HMAC check
   paystackWebhook: { limit: 60, windowSeconds: 60 },
   // Messaging: per-user hourly caps (new accounts get a tighter cap applied in code)
