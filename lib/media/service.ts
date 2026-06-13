@@ -77,28 +77,7 @@ export async function createPresignedUpload(
   }
 
   const expiresAt = new Date(Date.now() + PRESIGN_TTL_SECONDS * 1000);
-
-  const { data: row, error: insertError } = await supabase
-    .from("media_uploads")
-    .insert({
-      owner_id: input.userId,
-      context: input.context,
-      context_ref_id: input.contextRefId,
-      provider: useStream ? "stream" : "r2",
-      mime_type: v.mime,
-      original_filename: v.filename,
-      byte_size: v.byteSize,
-      status: "pending_upload",
-      expires_at: expiresAt.toISOString(),
-    })
-    .select("id")
-    .single();
-
-  if (insertError || !row) {
-    return { error: insertError?.message ?? "Could not create upload session." };
-  }
-
-  const uploadId = row.id as string;
+  const uploadId = crypto.randomUUID();
 
   if (useStream) {
     const stream = await createStreamDirectUpload({
@@ -106,10 +85,23 @@ export async function createPresignedUpload(
       uploadId,
     });
 
-    await supabase
-      .from("media_uploads")
-      .update({ stream_uid: stream.streamUid })
-      .eq("id", uploadId);
+    const { error: insertError } = await supabase.from("media_uploads").insert({
+      id: uploadId,
+      owner_id: input.userId,
+      context: input.context,
+      context_ref_id: input.contextRefId,
+      provider: "stream",
+      stream_uid: stream.streamUid,
+      mime_type: v.mime,
+      original_filename: v.filename,
+      byte_size: v.byteSize,
+      status: "pending_upload",
+      expires_at: expiresAt.toISOString(),
+    });
+
+    if (insertError) {
+      return { error: insertError.message };
+    }
 
     return {
       uploadId,
@@ -145,10 +137,23 @@ export async function createPresignedUpload(
     byteSize: v.byteSize,
   });
 
-  await supabase
-    .from("media_uploads")
-    .update({ object_key: objectKey })
-    .eq("id", uploadId);
+  const { error: insertError } = await supabase.from("media_uploads").insert({
+    id: uploadId,
+    owner_id: input.userId,
+    context: input.context,
+    context_ref_id: input.contextRefId,
+    provider: "r2",
+    object_key: objectKey,
+    mime_type: v.mime,
+    original_filename: v.filename,
+    byte_size: v.byteSize,
+    status: "pending_upload",
+    expires_at: expiresAt.toISOString(),
+  });
+
+  if (insertError) {
+    return { error: insertError.message };
+  }
 
   return {
     uploadId,
