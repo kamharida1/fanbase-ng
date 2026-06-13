@@ -91,25 +91,10 @@ export function ProfileEditor({
     router.refresh();
   }
 
-  async function saveImageUrl(type: "avatar" | "banner") {
-    setLoading(true);
-    setError(null);
-    const result = await updateProfileImageUrl(
-      type,
-      type === "avatar" ? avatarUrl : bannerUrl,
-    );
-    setLoading(false);
-    if (!result.success) {
-      setError(result.error);
-      return;
-    }
-    setSuccess(`${type === "avatar" ? "Profile photo" : "Banner"} updated.`);
-    router.refresh();
-  }
-
   async function handleUpload(type: "avatar" | "banner", file: File) {
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       const uploaded = await uploadFileWithPresign({
         context: "profile",
@@ -125,9 +110,14 @@ export function ProfileEditor({
         return;
       }
       const url = `/api/v1/media/delivery?uploadId=${uploaded.uploadId}&redirect=1`;
+      const result = await updateProfileImageUrl(type, url);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
       if (type === "avatar") setAvatarUrl(url);
       else setBannerUrl(url);
-      setSuccess("Image uploaded.");
+      setSuccess(`${type === "avatar" ? "Profile photo" : "Banner"} updated.`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
@@ -175,64 +165,48 @@ export function ProfileEditor({
 
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Profile photo</h2>
-        <div className="space-y-2">
-          <Label htmlFor="avatarUrl">Image URL</Label>
-          <Input
-            id="avatarUrl"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-            placeholder="https://..."
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarUrl}
+            alt=""
+            className="h-20 w-20 rounded-full border object-cover"
           />
-        </div>
+        ) : null}
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp"
           className="text-sm"
+          disabled={loading}
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) void handleUpload("avatar", file);
           }}
         />
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => saveImageUrl("avatar")}
-          disabled={loading}
-        >
-          Save photo URL
-        </Button>
       </section>
 
       {creator ? (
         <>
           <section className="space-y-4">
             <h2 className="text-lg font-semibold">Banner</h2>
-            <div className="space-y-2">
-              <Label htmlFor="bannerUrl">Banner URL</Label>
-              <Input
-                id="bannerUrl"
-                value={bannerUrl}
-                onChange={(e) => setBannerUrl(e.target.value)}
-                placeholder="https://..."
+            {bannerUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={bannerUrl}
+                alt=""
+                className="h-32 w-full rounded-lg border object-cover"
               />
-            </div>
+            ) : null}
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
               className="text-sm"
+              disabled={loading}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) void handleUpload("banner", file);
               }}
             />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => saveImageUrl("banner")}
-              disabled={loading}
-            >
-              Save banner URL
-            </Button>
           </section>
 
           <section className="space-y-4">
