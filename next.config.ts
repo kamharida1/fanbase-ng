@@ -11,7 +11,7 @@ const csp = [
   "script-src 'self' 'unsafe-inline' https://js.paystack.co",
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: https://${supabaseHost} https://*.supabase.co https://*.r2.cloudflarestorage.com https://videodelivery.net`,
-  `connect-src 'self' https://${supabaseHost} https://*.supabase.co wss://${supabaseHost} wss://*.supabase.co https://api.paystack.co https://*.sentry.io`,
+  `connect-src 'self' https://${supabaseHost} https://*.supabase.co wss://${supabaseHost} wss://*.supabase.co https://api.paystack.co https://*.sentry.io https://*.r2.cloudflarestorage.com https://*.cloudflarestream.com https://*.videodelivery.net`,
   `media-src 'self' https://*.r2.cloudflarestorage.com https://videodelivery.net`,
   "frame-src https://checkout.paystack.com",
   "font-src 'self' data:",
