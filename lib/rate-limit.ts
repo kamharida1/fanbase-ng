@@ -125,6 +125,8 @@ export const RATE_LIMITS = {
   // capping automated credential stuffing / signup spam.
   authLogin: { limit: 30, windowSeconds: 60 },
   authSignup: { limit: 15, windowSeconds: 60 },
+  // OTP verification: enough for genuine retries, tight enough to block brute-forcing a 6-digit code.
+  authVerifyOtp: { limit: 10, windowSeconds: 60 },
   // Paystack webhook: protect against flood before HMAC check
   paystackWebhook: { limit: 60, windowSeconds: 60 },
   // Messaging: per-user hourly caps (new accounts get a tighter cap applied in code)

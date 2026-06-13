@@ -35,34 +35,6 @@ export type AuthActionResult =
   | { success: true; requiresEmailVerification?: boolean }
   | { success: false; error: string; retryAfter?: number };
 
-export async function signInWithEmail(
-  email: string,
-  password: string,
-): Promise<AuthActionResult> {
-  const ip = await getIp();
-  const key = `authLogin:${email.trim().toLowerCase()}:${ip}`;
-  const rl = await checkRateLimit(key, RATE_LIMITS.authLogin);
-  if (!rl.ok) {
-    return {
-      success: false,
-      error: `Too many login attempts. Try again in ${rl.retryAfterSeconds}s.`,
-      retryAfter: rl.retryAfterSeconds,
-    };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
-    email: email.trim().toLowerCase(),
-    password,
-  });
-
-  if (error) {
-    return { success: false, error: mapAuthError(error.message) };
-  }
-
-  return { success: true };
-}
-
 /** Sign in, record session, and resolve redirect in one request so auth cookies are available. */
 export async function signInAndRedirect(
   email: string,
@@ -138,7 +110,14 @@ export async function signUpWithEmail(input: {
   username?: string;
   dateOfBirth: string;
   refCode?: string;
+  honeypot?: string;
 }): Promise<AuthActionResult> {
+  if (input.honeypot) {
+    // Bot filled a field that's hidden from real users. Pretend it worked
+    // so the bot doesn't learn anything, without touching Supabase.
+    return { success: true, requiresEmailVerification: true };
+  }
+
   const ip = await getIp();
   const key = `authSignup:${ip}`;
   const rl = await checkRateLimit(key, RATE_LIMITS.authSignup);
@@ -202,6 +181,108 @@ export async function signUpWithEmail(input: {
     success: true,
     requiresEmailVerification: !data.session,
   };
+}
+
+/** Verify the signup OTP, establish the session, and resolve the post-login path. */
+export async function verifySignupOtp(
+  email: string,
+  code: string,
+  userAgent?: string,
+): Promise<
+  | { success: true; redirectTo: string }
+  | { success: false; error: string; retryAfter?: number }
+> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const ip = await getIp();
+  const key = `authVerifyOtp:${normalizedEmail}:${ip}`;
+  const rl = await checkRateLimit(key, RATE_LIMITS.authVerifyOtp);
+  if (!rl.ok) {
+    return {
+      success: false,
+      error: `Too many attempts. Try again in ${rl.retryAfterSeconds}s.`,
+      retryAfter: rl.retryAfterSeconds,
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: normalizedEmail,
+    token: code.trim(),
+    type: "signup",
+  });
+
+  if (error || !data.user) {
+    return {
+      success: false,
+      error: mapAuthError(error?.message ?? "Verification failed."),
+    };
+  }
+
+  const headerStore = await headers();
+  const forwarded = headerStore.get("x-forwarded-for");
+  const sessionIp = forwarded?.split(",")[0]?.trim() ?? null;
+
+  await insertUserSession(supabase, data.user.id, {
+    userAgent: userAgent ?? headerStore.get("user-agent"),
+    ipAddress: sessionIp,
+  });
+
+  const ctx = await getAuthContext(supabase);
+  if (!ctx) {
+    return {
+      success: false,
+      error: "Your account profile could not be loaded. Contact support if this persists.",
+    };
+  }
+
+  return { success: true, redirectTo: getDefaultPathForRole(ctx.appRole) };
+}
+
+/** Verify the password-reset OTP and set the new password in one step. */
+export async function verifyRecoveryOtpAndSetPassword(
+  email: string,
+  code: string,
+  newPassword: string,
+): Promise<{ success: true } | { success: false; error: string; retryAfter?: number }> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const ip = await getIp();
+  const key = `authVerifyOtp:${normalizedEmail}:${ip}`;
+  const rl = await checkRateLimit(key, RATE_LIMITS.authVerifyOtp);
+  if (!rl.ok) {
+    return {
+      success: false,
+      error: `Too many attempts. Try again in ${rl.retryAfterSeconds}s.`,
+      retryAfter: rl.retryAfterSeconds,
+    };
+  }
+
+  const supabase = await createClient();
+
+  // Drop any existing session so the new password can only ever be applied
+  // to the account proven by the OTP code, not whoever was already signed in.
+  await supabase.auth.signOut();
+
+  const { error: otpError } = await supabase.auth.verifyOtp({
+    email: normalizedEmail,
+    token: code.trim(),
+    type: "recovery",
+  });
+
+  if (otpError) {
+    return { success: false, error: mapAuthError(otpError.message) };
+  }
+
+  const { error: updateError } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+
+  await supabase.auth.signOut();
+
+  if (updateError) {
+    return { success: false, error: mapAuthError(updateError.message) };
+  }
+
+  return { success: true };
 }
 
 export async function signOut() {

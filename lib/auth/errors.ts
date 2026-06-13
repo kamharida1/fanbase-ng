@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 /** Map Supabase Auth errors to user-safe messages. */
 export function mapAuthError(message: string): string {
   const lower = message.toLowerCase();
@@ -33,5 +35,7 @@ export function mapAuthError(message: string): string {
     return "That code is incorrect. Check your email and try again.";
   }
 
-  return message;
+  // Don't leak raw provider error text to end users.
+  logger.warn("auth.unmapped_error", { message });
+  return "Something went wrong. Please try again.";
 }

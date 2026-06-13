@@ -37,12 +37,18 @@ export function SignupForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [consentChecked, setConsentChecked] = useState(false);
+  const [honeypot, setHoneypot] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (honeypot) {
+      // Silently drop likely-bot submissions without tipping them off.
+      return;
+    }
 
     const normalizedUsername = username.trim().toLowerCase();
     if (normalizedUsername && !USERNAME_PATTERN.test(normalizedUsername)) {
@@ -84,6 +90,7 @@ export function SignupForm() {
         username: normalizedUsername || undefined,
         dateOfBirth,
         refCode: refCode || undefined,
+        honeypot: honeypot || undefined,
       });
 
       if (!result.success) {
@@ -114,6 +121,22 @@ export function SignupForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {/* Honeypot: hidden from real users, bots that fill every field trip this */}
+      <div
+        aria-hidden="true"
+        style={{ position: "absolute", left: "-9999px", width: 1, height: 1, overflow: "hidden" }}
+      >
+        <Label htmlFor="company">Leave this field blank</Label>
+        <Input
+          id="company"
+          name="company"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={honeypot}
+          onChange={(e) => setHoneypot(e.target.value)}
+        />
+      </div>
       <div className="space-y-2">
         <Label htmlFor="displayName">Display name</Label>
         <Input

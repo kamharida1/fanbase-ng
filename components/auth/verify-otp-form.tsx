@@ -3,13 +3,11 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { recordSession, resolvePostLoginPath } from "@/app/(auth)/actions";
+import { verifySignupOtp } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { OTP_LENGTH } from "@/lib/auth/constants";
-import { mapAuthError } from "@/lib/auth/errors";
-import { createClient } from "@/lib/supabase/client";
 
 export function VerifyOtpForm() {
   const router = useRouter();
@@ -25,26 +23,25 @@ export function VerifyOtpForm() {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: otpError } = await supabase.auth.verifyOtp({
-      email: email.trim().toLowerCase(),
-      token: code.trim(),
-      type: "signup",
-    });
+    try {
+      const result = await verifySignupOtp(
+        email,
+        code,
+        typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      );
 
-    if (otpError) {
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+
+      router.push(result.redirectTo);
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
-      setError(mapAuthError(otpError.message));
-      return;
     }
-
-    await recordSession(
-      typeof navigator !== "undefined" ? navigator.userAgent : undefined,
-    );
-    const dest = await resolvePostLoginPath("/feed");
-    setLoading(false);
-    router.push(dest);
-    router.refresh();
   }
 
   return (
