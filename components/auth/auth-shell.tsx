@@ -73,6 +73,7 @@ export const FAN_NAV: NavLink[] = [
 
 export const CREATOR_NAV: NavLink[] = [
   { href: "/creator/dashboard", label: "Dashboard" },
+  { href: "/creator/content/new", label: "+ New post" },
   { href: "/creator/live", label: "🔴 Go Live" },
   { href: "/creator/broadcast", label: "Broadcast" },
   { href: "/creator/fans", label: "Fans" },

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { CreatePostPrompt } from "@/components/posts/create-post-prompt";
 import { OnboardingChecklist } from "@/components/onboarding/onboarding-checklist";
 import { BalanceCards } from "@/components/wallet/balance-cards";
 import { TransactionList } from "@/components/wallet/transaction-list";
@@ -27,6 +28,8 @@ export default async function CreatorDashboardPage() {
           Earnings overview and recent wallet activity.
         </p>
       </div>
+
+      <CreatePostPrompt />
 
       <OnboardingChecklist status={onboarding} />
 

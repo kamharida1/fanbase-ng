@@ -11,6 +11,7 @@ import {
   Home,
   LayoutDashboard,
   MessageSquare,
+  PlusCircle,
   Star,
 } from "lucide-react";
 
@@ -20,6 +21,7 @@ type BottomNavItem = {
   href: string;
   label: string;
   Icon: React.ComponentType<{ className?: string }>;
+  cta?: boolean;
 };
 
 const FAN_ITEMS: BottomNavItem[] = [
@@ -33,6 +35,7 @@ const FAN_ITEMS: BottomNavItem[] = [
 const CREATOR_ITEMS: BottomNavItem[] = [
   { href: "/creator/dashboard", label: "Home", Icon: LayoutDashboard },
   { href: "/creator/content", label: "Content", Icon: Film },
+  { href: "/creator/content/new", label: "Create", Icon: PlusCircle, cta: true },
   { href: "/creator/analytics", label: "Stats", Icon: BarChart2 },
   { href: "/creator/messages", label: "Messages", Icon: MessageSquare },
   { href: "/creator/earnings", label: "Earnings", Icon: DollarSign },
@@ -47,7 +50,7 @@ function BottomNav({ items }: { items: BottomNavItem[] }) {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul className="flex h-16 items-center justify-around">
-        {items.map(({ href, label, Icon }) => {
+        {items.map(({ href, label, Icon, cta }) => {
           const active =
             pathname === href ||
             (href !== "/" && pathname.startsWith(href));
@@ -58,10 +61,14 @@ function BottomNav({ items }: { items: BottomNavItem[] }) {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex flex-col items-center gap-0.5 px-3 py-2 text-[10px] font-medium transition-colors",
-                  active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                  cta
+                    ? "text-primary"
+                    : active
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className={cn("h-5 w-5", cta && "h-7 w-7")} />
                 <span>{label}</span>
               </Link>
             </li>
