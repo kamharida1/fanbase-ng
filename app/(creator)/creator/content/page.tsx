@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { CreatePostPrompt } from "@/components/posts/create-post-prompt";
 import { CreatorPostList } from "@/components/posts/creator-post-list";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
 import { listCreatorPosts } from "@/lib/posts/queries";
@@ -29,6 +30,7 @@ export default async function CreatorContentPage() {
           New post
         </Link>
       </div>
+      <CreatePostPrompt />
       <CreatorPostList posts={posts} />
     </div>
   );
