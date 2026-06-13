@@ -4,11 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { requestPasswordReset } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { mapAuthError } from "@/lib/auth/errors";
-import { createClient } from "@/lib/supabase/client";
 
 export function ForgotPasswordForm() {
   const router = useRouter();
@@ -21,19 +20,11 @@ export function ForgotPasswordForm() {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
-
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      { redirectTo: `${appUrl}/reset-password` },
-    );
-
+    const result = await requestPasswordReset(email);
     setLoading(false);
 
-    if (resetError) {
-      setError(mapAuthError(resetError.message));
+    if ("error" in result) {
+      setError(result.error);
       return;
     }
 

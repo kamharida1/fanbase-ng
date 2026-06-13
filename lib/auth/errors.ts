@@ -17,6 +17,12 @@ export function mapAuthError(message: string): string {
   if (lower.includes("rate limit") || lower.includes("too many requests")) {
     return "Too many attempts. Please wait a few minutes and try again.";
   }
+  if (
+    lower.includes("code verifier") ||
+    lower.includes("pkce")
+  ) {
+    return "This link must be opened in the same browser where you requested it. Request a new link and try again.";
+  }
   if (lower.includes("signup is disabled")) {
     return "Registration is temporarily unavailable.";
   }

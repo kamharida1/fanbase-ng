@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 
 const MESSAGES: Record<string, string> = {
   auth_callback: "Sign-in link expired or invalid. Please try again.",
+  auth_callback_pkce:
+    "This link must be opened in the same browser where you requested it. Request a new link and try again.",
   password_updated: "Your password has been updated. You can sign in now.",
   check_email_reset: "If that email exists, we sent a password reset link.",
   verify_email: "Check your email to verify your account before signing in.",

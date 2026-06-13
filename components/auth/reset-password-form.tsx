@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -13,35 +13,27 @@ import { createClient } from "@/lib/supabase/client";
 
 export function ResetPasswordForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const code = searchParams.get("code");
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
-  const [exchanging, setExchanging] = useState(Boolean(code));
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (!code) {
-      setExchanging(false);
-      setReady(true);
-      return;
-    }
-
     const supabase = createClient();
-    supabase.auth
-      .exchangeCodeForSession(code)
-      .then(({ error: exchangeError }) => {
-        setExchanging(false);
-        if (exchangeError) {
-          setError(mapAuthError(exchangeError.message));
-          return;
-        }
-        setReady(true);
-      });
-  }, [code]);
+    supabase.auth.getUser().then(({ data: { user }, error: userError }) => {
+      setChecking(false);
+      if (userError || !user) {
+        setError(
+          "This reset link is invalid or expired. Request a new one from the same browser you used to send it.",
+        );
+        return;
+      }
+      setReady(true);
+    });
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -73,7 +65,7 @@ export function ResetPasswordForm() {
     router.refresh();
   }
 
-  if (exchanging) {
+  if (checking) {
     return (
       <p className="text-center text-sm text-muted-foreground">
         Verifying reset link…

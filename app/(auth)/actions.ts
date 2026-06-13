@@ -296,6 +296,22 @@ export async function resendVerificationEmail(email: string) {
   return { success: true };
 }
 
+export async function requestPasswordReset(
+  email: string,
+): Promise<{ success: true } | { error: string }> {
+  const supabase = await createClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const redirectTo = `${appUrl}/callback?next=${encodeURIComponent("/reset-password")}`;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    email.trim().toLowerCase(),
+    { redirectTo },
+  );
+
+  if (error) return { error: mapAuthError(error.message) };
+  return { success: true };
+}
+
 export async function updatePassword(newPassword: string) {
   const supabase = await createClient();
   const {

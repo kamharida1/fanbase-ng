@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import { fetchAuthContext } from "@/lib/auth/get-auth-context";
 import { getDefaultPathForRole } from "@/lib/auth/rbac";
@@ -8,9 +8,9 @@ import { sendTransactionalEmail } from "@/lib/email/send";
 import { insertUserSession } from "@/lib/auth/session";
 import { recordReferral } from "@/lib/referrals/actions";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const nextRaw = searchParams.get("next");
@@ -21,11 +21,15 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=auth_callback`);
   }
 
-  const supabase = await createClient();
+  const { supabase, applyCookies } = createRouteHandlerClient(request);
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error || !data.user) {
-    return NextResponse.redirect(`${origin}/login?error=auth_callback`);
+    const isPkce =
+      error?.message.toLowerCase().includes("code verifier") ||
+      error?.message.toLowerCase().includes("pkce");
+    const errParam = isPkce ? "auth_callback_pkce" : "auth_callback";
+    return NextResponse.redirect(`${origin}/login?error=${errParam}`);
   }
 
   const headerStore = request.headers;
@@ -37,21 +41,17 @@ export async function GET(request: Request) {
     ipAddress: ip,
   });
 
-  // Detect new user (confirmed within the last 2 minutes)
   const confirmedAt = data.user.confirmed_at
     ? new Date(data.user.confirmed_at).getTime()
     : 0;
   const isNewUser = Date.now() - confirmedAt < 2 * 60 * 1000;
 
-  // Record referral if a ref code was passed through the email link
   if (refCode && isNewUser) {
     recordReferral(createAdminClient(), {
       refereeId: data.user.id,
       refCode,
     }).catch((err) => console.error("[referral] record failed", err));
   }
-
-  // Send welcome email to brand-new users
 
   if (isNewUser && data.user.email && !refCode) {
     const displayName =
@@ -72,17 +72,17 @@ export async function GET(request: Request) {
     (auth.profile.status === "banned" || auth.profile.status === "suspended")
   ) {
     await supabase.auth.signOut();
-    return NextResponse.redirect(`${origin}/login?error=account_disabled`);
+    return applyCookies(
+      NextResponse.redirect(`${origin}/login?error=account_disabled`),
+    );
   }
 
   let dest = "/feed";
-  if (auth) {
-    if (safeNext && canAccessPath(safeNext, auth.appRole)) {
-      dest = safeNext;
-    } else {
-      dest = getDefaultPathForRole(auth.appRole);
-    }
+  if (safeNext && (!auth || canAccessPath(safeNext, auth.appRole))) {
+    dest = safeNext;
+  } else if (auth) {
+    dest = getDefaultPathForRole(auth.appRole);
   }
 
-  return NextResponse.redirect(`${origin}${dest}`);
+  return applyCookies(NextResponse.redirect(`${origin}${dest}`));
 }
