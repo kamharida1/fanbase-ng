@@ -148,7 +148,7 @@ export async function updateProfileImageUrl(
   url: string,
 ): Promise<ActionResult> {
   const trimmed = url.trim();
-  if (trimmed && !/^https?:\/\//.test(trimmed)) {
+  if (trimmed && !/^https?:\/\//.test(trimmed) && !/^\/(?!\/)/.test(trimmed)) {
     return { success: false, error: "Image URL must start with http:// or https://" };
   }
 
