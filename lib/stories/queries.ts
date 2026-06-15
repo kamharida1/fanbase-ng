@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  buildMediaDeliveryProxyUrl,
+  normalizeMediaUrl,
+} from "@/lib/media/delivery-url";
+
 export type StoryViewer = {
   viewer_id: string;
   username: string;
@@ -118,7 +123,7 @@ export async function getStoryGroups(
     .select(
       `id, creator_id, type, caption, expires_at, created_at,
        visibility,
-       post_media!left (r2_key, stream_uid, media_type, sort_order),
+       post_media!left (r2_key, stream_uid, media_type, sort_order, media_upload_id),
        profiles!inner (id, username, display_name, avatar_url)`,
     )
     .eq("is_story", true)
@@ -182,10 +187,13 @@ export async function getStoryGroups(
     if (!profile) continue;
 
     const media = Array.isArray(post.post_media) ? post.post_media[0] : null;
-    const mediaUrl =
-      media?.r2_key
-        ? `/api/v1/media/delivery?objectKey=${encodeURIComponent(media.r2_key)}`
-        : null;
+    const mediaUrl = media
+      ? buildMediaDeliveryProxyUrl({
+          uploadId: media.media_upload_id,
+          streamUid: media.stream_uid,
+          objectKey: media.r2_key,
+        })
+      : null;
 
     const story: StoryItem = {
       id: post.id,
@@ -204,7 +212,7 @@ export async function getStoryGroups(
           id: profile.id,
           username: profile.username,
           display_name: profile.display_name,
-          avatar_url: profile.avatar_url,
+          avatar_url: normalizeMediaUrl(profile.avatar_url),
         },
         stories: [],
         hasUnviewed: false,

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { normalizeSocialLinks } from "@/lib/creators/format";
+import { normalizeMediaUrl } from "@/lib/media/delivery-url";
 import {
   postgrestIlikePattern,
   sanitizePostgrestIlikeTerm,
@@ -174,9 +175,9 @@ export async function getCreatorByUsername(
     user_id: profile.id,
     username: profile.username,
     display_name: profile.display_name,
-    avatar_url: profile.avatar_url,
+    avatar_url: normalizeMediaUrl(profile.avatar_url),
     bio: creator.bio,
-    banner_url: creator.banner_url,
+    banner_url: normalizeMediaUrl(creator.banner_url),
     is_verified: creator.is_verified,
     is_accepting_subscribers: creator.is_accepting_subscribers,
     social_links: normalizeSocialLinks(

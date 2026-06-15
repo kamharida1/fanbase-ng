@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { canDeliverByObjectKey, canDeliverMedia } from "@/lib/media/access";
+import { buildMediaDeliveryProxyUrl } from "@/lib/media/delivery-url";
 import { assertCanUploadToContext } from "@/lib/media/context-auth";
 import { PRESIGN_TTL_SECONDS } from "@/lib/media/constants";
 import {
@@ -18,6 +19,8 @@ import {
   createStreamSignedPlaybackUrl,
   getStreamVideo,
 } from "@/lib/media/stream/direct-upload";
+import { POST_MEDIA_BUCKET } from "@/lib/posts/constants";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { validateMagicBytes, validateUploadRequest } from "@/lib/media/validation";
 import {
   applyVirusScanResult,
@@ -343,7 +346,7 @@ export async function confirmMediaUpload(
     if (!bound) return { error: "Could not attach media to content." };
 
     if (bound.context === "profile") {
-      const deliveryUrl = `${APP_URL}/api/v1/media/delivery?uploadId=${bound.id}&redirect=1`;
+      const deliveryUrl = buildMediaDeliveryProxyUrl({ uploadId: bound.id })!;
       const field =
         bound.original_filename.toLowerCase().includes("banner")
           ? "banner"
@@ -396,6 +399,41 @@ export async function confirmMediaUpload(
   };
 }
 
+const DELIVERABLE_UPLOAD_STATUSES = ["ready", "uploaded", "scanning"] as const;
+
+async function resolveLegacyPostMediaDelivery(
+  supabase: SupabaseClient,
+  input: { viewerId: string | null; objectKey: string },
+): Promise<MediaDeliveryResponse | null> {
+  const admin = createAdminClient();
+  const { data: media } = await admin
+    .from("post_media")
+    .select("post_id")
+    .eq("r2_key", input.objectKey)
+    .maybeSingle();
+
+  if (!media?.post_id) return null;
+
+  const { data: canView } = await supabase.rpc("can_view_post", {
+    p_user_id: input.viewerId,
+    p_post_id: media.post_id,
+  });
+
+  if (!canView) return null;
+
+  const { data, error } = await admin.storage
+    .from(POST_MEDIA_BUCKET)
+    .createSignedUrl(input.objectKey, 3600);
+
+  if (error || !data?.signedUrl) return null;
+
+  return {
+    url: data.signedUrl,
+    expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+    provider: "r2",
+  };
+}
+
 export async function getMediaDeliveryUrl(
   supabase: SupabaseClient,
   input: {
@@ -419,7 +457,7 @@ export async function getMediaDeliveryUrl(
       .from("media_uploads")
       .select("*")
       .eq("id", input.uploadId)
-      .eq("status", "ready")
+      .in("status", [...DELIVERABLE_UPLOAD_STATUSES])
       .maybeSingle();
     upload = data as MediaUploadRow | null;
   } else {
@@ -428,6 +466,14 @@ export async function getMediaDeliveryUrl(
       objectKey: input.objectKey ?? null,
       streamUid: input.streamUid ?? null,
     });
+  }
+
+  if (!upload && input.objectKey) {
+    const legacy = await resolveLegacyPostMediaDelivery(supabase, {
+      viewerId: input.viewerId,
+      objectKey: input.objectKey,
+    });
+    if (legacy) return legacy;
   }
 
   if (!upload) return { error: "Media not found." };

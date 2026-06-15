@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  buildMediaDeliveryProxyUrl,
+  normalizeMediaUrl,
+} from "@/lib/media/delivery-url";
 import { isR2Configured, isStreamConfigured } from "@/lib/media/config";
-import { getMediaDeliveryUrl } from "@/lib/media/service";
-import { getPostMediaSignedUrl } from "@/lib/posts/storage";
-import { getSignedAttachmentUrl } from "@/lib/messaging/storage";
 
 export async function resolvePostMediaUrl(
   supabase: SupabaseClient,
@@ -17,43 +18,27 @@ export async function resolvePostMediaUrl(
   },
 ): Promise<string | null> {
   if (!input.canViewFull) {
-    if (input.thumbnailUrl) return input.thumbnailUrl;
+    if (input.thumbnailUrl) return normalizeMediaUrl(input.thumbnailUrl);
     if (input.streamUid) {
       return `https://videodelivery.net/${input.streamUid}/thumbnails/thumbnail.jpg`;
     }
     return null;
   }
 
+  // Stable same-origin proxy URLs — access is enforced when the browser loads them.
   if (input.mediaUploadId && (isR2Configured() || isStreamConfigured())) {
-    const result = await getMediaDeliveryUrl(supabase, {
-      viewerId: input.viewerId,
-      uploadId: input.mediaUploadId,
-    });
-    if (!("error" in result)) return result.url;
+    return buildMediaDeliveryProxyUrl({ uploadId: input.mediaUploadId });
   }
 
   if (input.streamUid && isStreamConfigured()) {
-    const result = await getMediaDeliveryUrl(supabase, {
-      viewerId: input.viewerId,
-      streamUid: input.streamUid,
-    });
-    if (!("error" in result)) return result.url;
-    return `https://iframe.videodelivery.net/${input.streamUid}`;
-  }
-
-  if (input.r2Key && isR2Configured()) {
-    const result = await getMediaDeliveryUrl(supabase, {
-      viewerId: input.viewerId,
-      objectKey: input.r2Key,
-    });
-    if (!("error" in result)) return result.url;
+    return buildMediaDeliveryProxyUrl({ streamUid: input.streamUid });
   }
 
   if (input.r2Key) {
-    return getPostMediaSignedUrl(supabase, input.r2Key);
+    return buildMediaDeliveryProxyUrl({ objectKey: input.r2Key });
   }
 
-  return input.thumbnailUrl ?? null;
+  return normalizeMediaUrl(input.thumbnailUrl);
 }
 
 export async function resolveMessageAttachmentUrl(
@@ -65,23 +50,11 @@ export async function resolveMessageAttachmentUrl(
   },
 ): Promise<string | null> {
   if (input.mediaUploadId && (isR2Configured() || isStreamConfigured())) {
-    const result = await getMediaDeliveryUrl(supabase, {
-      viewerId: input.viewerId,
-      uploadId: input.mediaUploadId,
-    });
-    if (!("error" in result)) return result.url;
-  }
-
-  if (input.storagePath && isR2Configured()) {
-    const result = await getMediaDeliveryUrl(supabase, {
-      viewerId: input.viewerId,
-      objectKey: input.storagePath,
-    });
-    if (!("error" in result)) return result.url;
+    return buildMediaDeliveryProxyUrl({ uploadId: input.mediaUploadId });
   }
 
   if (input.storagePath) {
-    return getSignedAttachmentUrl(supabase, input.storagePath);
+    return buildMediaDeliveryProxyUrl({ objectKey: input.storagePath });
   }
 
   return null;

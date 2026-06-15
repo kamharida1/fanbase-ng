@@ -1,6 +1,5 @@
-import Image from "next/image";
-
 import { cn } from "@/lib/utils";
+import { normalizeMediaUrl } from "@/lib/media/delivery-url";
 
 type AvatarProps = {
   src?: string | null;
@@ -10,6 +9,7 @@ type AvatarProps = {
 };
 
 export function Avatar({ src, alt, size = 40, className }: AvatarProps) {
+  const normalizedSrc = normalizeMediaUrl(src);
   const initials = alt
     .split(/\s+/)
     .slice(0, 2)
@@ -24,13 +24,12 @@ export function Avatar({ src, alt, size = 40, className }: AvatarProps) {
       )}
       style={{ width: size, height: size }}
     >
-      {src ? (
-        <Image
-          src={src}
+      {normalizedSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={normalizedSrc}
           alt={alt}
-          fill
-          sizes={`${size}px`}
-          className="object-cover"
+          className="h-full w-full object-cover"
         />
       ) : (
         <span

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolvePostMediaUrl } from "@/lib/media/resolve-url";
+import { normalizeMediaUrl } from "@/lib/media/delivery-url";
 import type {
   PollOption,
   PostAuthor,
@@ -46,7 +47,7 @@ async function loadAuthors(
         id: p.id,
         username: p.username,
         display_name: p.display_name,
-        avatar_url: p.avatar_url,
+        avatar_url: normalizeMediaUrl(p.avatar_url),
       },
     ]),
   );

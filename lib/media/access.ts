@@ -80,7 +80,7 @@ export async function canDeliverByObjectKey(
   let query = supabase
     .from("media_uploads")
     .select("*")
-    .eq("status", "ready");
+    .in("status", ["ready", "uploaded", "scanning"]);
 
   if (input.objectKey) {
     query = query.eq("object_key", input.objectKey);
