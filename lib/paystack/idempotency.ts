@@ -10,8 +10,9 @@ export function buildPaystackEventId(
   const sub = asEventKey(data.subscription_code);
   const refund = asEventKey(data.id) && event.startsWith("refund") ? asEventKey(data.id) : null;
   const invoice = asEventKey(data.invoice_code);
+  const transfer = asEventKey(data.transfer_code);
 
-  const key = ref ?? sub ?? refund ?? invoice;
+  const key = ref ?? sub ?? refund ?? invoice ?? transfer;
   if (key) return `${event}:${key}`;
 
   return `${event}:${hashPayloadSlice(data)}`;

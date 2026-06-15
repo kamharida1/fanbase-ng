@@ -17,6 +17,14 @@ describe("buildPaystackEventId", () => {
     ).toBe("subscription.create:SUB_xyz");
   });
 
+  it("uses transfer_code for transfer events", () => {
+    expect(
+      buildPaystackEventId("transfer.success", {
+        transfer_code: "TRF_abc123",
+      }),
+    ).toBe("transfer.success:TRF_abc123");
+  });
+
   it("hashes payload when no stable key", () => {
     const id = buildPaystackEventId("unknown.event", { foo: "bar" });
     expect(id.startsWith("unknown.event:")).toBe(true);

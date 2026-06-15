@@ -41,3 +41,15 @@ SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 Paystack dashboard webhook URL: `https://<app>/api/v1/webhooks/paystack`
+
+### Shared Paystack account with PrepNG
+
+Paystack allows one Live webhook URL per business. To run Fanbase and PrepNG on the same account:
+
+1. Set Paystack Live webhook to **`https://fanbaseng.com/api/v1/webhooks/paystack`**
+2. Set Vercel env **`PREPNG_PAYSTACK_WEBHOOK_URL=https://prepng.com/api/paystack/webhook`**
+   — Fanbase verifies and processes, then forwards a copy to PrepNG (same body + signature).
+3. PrepNG must **not** forward events back to Fanbase when it receives `x-forwarded-by: fanbaseng`.
+
+**Alternative** (keep Paystack on PrepNG temporarily): forward from PrepNG to  
+`https://fanbaseng.com/api/v1/webhooks/paystack/inbound` with the raw body and `x-paystack-signature`.

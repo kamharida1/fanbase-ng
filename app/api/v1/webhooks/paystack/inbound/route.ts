@@ -1,8 +1,6 @@
-import { after } from "next/server";
+import { NextResponse } from "next/server";
 
-import { logger } from "@/lib/logger";
 import { processPaystackWebhookRequest } from "@/lib/paystack/process-webhook-request";
-import { forwardPaystackWebhookToPrepNG } from "@/lib/paystack/relay";
 import { enforceRateLimit } from "@/lib/rate-limit-http";
 
 function requestIdFrom(request: Request): string {
@@ -13,31 +11,16 @@ function requestIdFrom(request: Request): string {
   );
 }
 
+/**
+ * Relay entrypoint when Paystack still posts to PrepNG first.
+ * PrepNG should forward the raw body + x-paystack-signature here.
+ * This route never forwards back to PrepNG (avoids loops).
+ */
 export async function POST(request: Request) {
   const rl = await enforceRateLimit(request, "paystackWebhook", "webhook");
   if (rl) return rl;
 
   const requestId = requestIdFrom(request);
   const result = await processPaystackWebhookRequest(request, requestId);
-
-  if (
-    result.shouldForwardToPrepNG &&
-    result.response.status === 200 &&
-    !request.headers.get("x-forwarded-by")
-  ) {
-    after(async () => {
-      const forward = await forwardPaystackWebhookToPrepNG(
-        result.rawBody,
-        result.signature,
-      );
-      if (!forward.ok) {
-        logger.warn("paystack.webhook.prepng_forward_skipped", {
-          reason: forward.reason,
-          requestId,
-        });
-      }
-    });
-  }
-
   return result.response;
 }
