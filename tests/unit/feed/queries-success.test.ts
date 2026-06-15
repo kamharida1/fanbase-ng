@@ -54,6 +54,13 @@ describe("getHomeFeedPage success", () => {
         ],
         error: null,
       }),
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }),
     };
 
     const page = await getHomeFeedPage(supabase as never, "fan", {

@@ -3,11 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart2,
   Bell,
   Compass,
-  DollarSign,
-  Film,
   Home,
   LayoutDashboard,
   MessageSquare,
@@ -25,7 +22,7 @@ type BottomNavItem = {
 };
 
 const FAN_ITEMS: BottomNavItem[] = [
-  { href: "/feed", label: "Home", Icon: Home },
+  { href: "/feed", label: "Feed", Icon: Home },
   { href: "/discover", label: "Discover", Icon: Compass },
   { href: "/subscriptions", label: "Following", Icon: Star },
   { href: "/messages", label: "Messages", Icon: MessageSquare },
@@ -33,12 +30,11 @@ const FAN_ITEMS: BottomNavItem[] = [
 ];
 
 const CREATOR_ITEMS: BottomNavItem[] = [
-  { href: "/creator/dashboard", label: "Home", Icon: LayoutDashboard },
-  { href: "/creator/content", label: "Content", Icon: Film },
+  { href: "/feed", label: "Feed", Icon: Home },
+  { href: "/discover", label: "Discover", Icon: Compass },
   { href: "/creator/content/new", label: "Create", Icon: PlusCircle, cta: true },
-  { href: "/creator/analytics", label: "Stats", Icon: BarChart2 },
+  { href: "/creator/dashboard", label: "Studio", Icon: LayoutDashboard },
   { href: "/creator/messages", label: "Messages", Icon: MessageSquare },
-  { href: "/creator/earnings", label: "Earnings", Icon: DollarSign },
 ];
 
 function BottomNav({ items }: { items: BottomNavItem[] }) {

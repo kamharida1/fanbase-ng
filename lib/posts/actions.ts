@@ -56,10 +56,13 @@ async function attachPollIfMissing(
   );
 }
 
-function revalidatePostPaths(userId?: string) {
+function revalidatePostPaths(userId?: string, username?: string | null) {
   revalidatePath("/creator/content");
   revalidatePath("/feed");
   revalidatePath("/discover");
+  if (username) {
+    revalidatePath(`/creators/${username}`);
+  }
   if (userId) {
     revalidateTag(feedCacheTag(userId));
   }
@@ -108,17 +111,41 @@ export async function savePost(
   const publishNow = parsed.data.publishNow === true;
   const scheduledAt = parsed.data.scheduledAt;
 
+  let existingPost: {
+    status: string;
+    published_at: string | null;
+    moderation_status: string;
+    scheduled_publish_at: string | null;
+  } | null = null;
+
+  if (parsed.data.postId) {
+    const { data } = await supabase
+      .from("posts")
+      .select("status, published_at, moderation_status, scheduled_publish_at")
+      .eq("id", parsed.data.postId)
+      .eq("creator_id", auth.userId)
+      .maybeSingle();
+    existingPost = data;
+  }
+
   let status: "draft" | "published" = "draft";
   let publishedAt: string | null = null;
   let scheduledPublishAt: string | null = scheduledAt ?? null;
+  let moderationStatus = "pending";
 
   if (publishNow) {
     status = "published";
     publishedAt = new Date().toISOString();
     scheduledPublishAt = null;
+    moderationStatus = "approved";
   } else if (scheduledAt && new Date(scheduledAt) > new Date()) {
     status = "draft";
     scheduledPublishAt = scheduledAt;
+  } else if (existingPost?.status === "published") {
+    status = "published";
+    publishedAt = existingPost.published_at;
+    scheduledPublishAt = existingPost.scheduled_publish_at;
+    moderationStatus = existingPost.moderation_status ?? "approved";
   }
 
   const payload = {
@@ -133,7 +160,7 @@ export async function savePost(
     status,
     published_at: publishedAt,
     scheduled_publish_at: scheduledPublishAt,
-    moderation_status: status === "published" ? "pending" : "pending",
+    moderation_status: moderationStatus,
   };
 
   if (parsed.data.postId) {
@@ -145,7 +172,7 @@ export async function savePost(
 
   if (error) return { success: false, error: error.message };
   await attachPollIfMissing(supabase, parsed.data.postId, parsed.data.poll);
-  revalidatePostPaths(auth.userId);
+  revalidatePostPaths(auth.userId, auth.profile.username);
   return { success: true, data: { postId: parsed.data.postId } };
   }
 
@@ -158,7 +185,7 @@ export async function savePost(
   if (error) return { success: false, error: error.message };
 
   await attachPollIfMissing(supabase, data.id, parsed.data.poll);
-  revalidatePostPaths(auth.userId);
+  revalidatePostPaths(auth.userId, auth.profile.username);
   return { success: true, data: { postId: data.id } };
 }
 

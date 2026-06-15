@@ -7,7 +7,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
-import { uploadFileWithPresign } from "@/lib/media/client-upload";
+import { uploadFileWithPresign, pollUploadUntilReady, humanizeUploadError } from "@/lib/media/client-upload";
 import { archivePost, savePost } from "@/lib/posts/actions";
 import { CategoryPicker } from "@/components/vault/category-picker";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ type GalleryItem = {
   localId: string;
   dataUrl: string;
   file: File;
-  status: "pending" | "uploading" | "done" | "error";
+  status: "pending" | "uploading" | "scanning" | "done" | "error";
 };
 
 export function PostEditor({
@@ -31,11 +31,13 @@ export function PostEditor({
   plans,
   categories = [],
   assignedCategoryIds = [],
+  mediaStorageConfigured = true,
 }: {
   post?: PostRow;
   plans: PlanOption[];
   categories?: CategoryRow[];
   assignedCategoryIds?: string[];
+  mediaStorageConfigured?: boolean;
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -60,7 +62,7 @@ export function PostEditor({
   const [gallery, setGallery] = useState<GalleryItem[]>(initialGallery);
 
   const [caption, setCaption] = useState(post?.caption ?? "");
-  const [visibility, setVisibility] = useState(post?.visibility ?? "subscribers");
+  const [visibility, setVisibility] = useState(post?.visibility ?? "public");
   const [planId, setPlanId] = useState(post?.plan_id ?? "");
   const [ppvPrice, setPpvPrice] = useState(
     post?.ppv_price_kobo ? String(post.ppv_price_kobo / 100) : "",
@@ -150,13 +152,15 @@ export function PostEditor({
       setError(null);
       generateVideoThumbnail(file).then((url) => { if (url) setThumbnailPreview(url); });
       try {
-        const result = await uploadFileWithPresign({ context: "post", contextRefId: id, file });
-        if (result.status === "scanning") setError("Upload received — security scan in progress. Refresh in a moment.");
+        let result = await uploadFileWithPresign({ context: "post", contextRefId: id, file });
+        if (result.status === "scanning") {
+          result = await pollUploadUntilReady(result.uploadId);
+        }
         setType("video");
         setGallery([]);
         router.refresh();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Upload failed.");
+        setError(humanizeUploadError(err));
       } finally {
         setLoading(false);
       }
@@ -198,11 +202,20 @@ export function PostEditor({
         prev.map((g) => g.localId === item.localId ? { ...g, status: "uploading" } : g),
       );
       try {
-        await uploadFileWithPresign({ context: "post", contextRefId: id, file: item.file });
+        let result = await uploadFileWithPresign({ context: "post", contextRefId: id, file });
+        if (result.status === "scanning") {
+          setGallery((prev) =>
+            prev.map((g) => g.localId === item.localId ? { ...g, status: "scanning" } : g),
+          );
+          result = await pollUploadUntilReady(result.uploadId);
+        }
         setGallery((prev) =>
-          prev.map((g) => g.localId === item.localId ? { ...g, status: "done" } : g),
+          prev.map((g) =>
+            g.localId === item.localId ? { ...g, status: "done" } : g,
+          ),
         );
-      } catch {
+      } catch (err) {
+        setError(humanizeUploadError(err));
         setGallery((prev) =>
           prev.map((g) => g.localId === item.localId ? { ...g, status: "error" } : g),
         );
@@ -235,7 +248,7 @@ export function PostEditor({
     if (!result.success) { setError(result.error); return; }
     if (result.data?.postId) setPostId(result.data.postId);
     toast.success(publishNow ? "Post published!" : "Post saved.");
-    router.push("/creator/content");
+    router.push(publishNow ? "/feed?published=1" : "/creator/content");
     router.refresh();
   }
 
@@ -247,8 +260,12 @@ export function PostEditor({
     router.push("/creator/content");
   }
 
-  const hasUploading = gallery.some((g) => g.status === "uploading");
+  const hasUploading = gallery.some(
+    (g) => g.status === "uploading" || g.status === "scanning" || g.status === "pending",
+  );
   const doneImages = gallery.filter((g) => g.status === "done");
+  const needsMedia = type === "image" || type === "video";
+  const missingMedia = needsMedia && doneImages.length === 0 && !post?.media?.length;
 
   return (
     <div className="mx-auto min-w-0 max-w-2xl space-y-6">
@@ -486,6 +503,12 @@ export function PostEditor({
                       <Loader2 className="h-6 w-6 animate-spin text-white" />
                     </div>
                   )}
+                  {item.status === "scanning" && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/50 px-2 text-center">
+                      <Loader2 className="h-5 w-5 animate-spin text-white" />
+                      <span className="text-[10px] font-medium text-white">Processing</span>
+                    </div>
+                  )}
                   {item.status === "error" && (
                     <div className="absolute inset-0 flex items-center justify-center bg-destructive/40">
                       <AlertCircle className="h-6 w-6 text-white" />
@@ -497,7 +520,7 @@ export function PostEditor({
                     </div>
                   )}
                   {/* Remove button */}
-                  {item.status !== "uploading" && (
+                  {item.status !== "uploading" && item.status !== "scanning" && (
                     <button
                       type="button"
                       onClick={() => removeGalleryItem(item.localId)}
@@ -516,7 +539,7 @@ export function PostEditor({
             <Button
               type="button"
               variant="outline"
-              disabled={loading || hasUploading}
+              disabled={loading || hasUploading || !mediaStorageConfigured}
               onClick={() => fileRef.current?.click()}
             >
               {hasUploading
@@ -548,6 +571,12 @@ export function PostEditor({
           </div>
         )}
 
+        {missingMedia ? (
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            Add at least one finished image or video before publishing.
+          </p>
+        ) : null}
+
         {error ? (
           <p className="text-sm text-destructive" role="alert">{error}</p>
         ) : null}
@@ -562,7 +591,7 @@ export function PostEditor({
           </Button>
           <Button
             type="button"
-            disabled={loading || hasUploading}
+            disabled={loading || hasUploading || missingMedia}
             onClick={() => void handleSave(true)}
           >
             Publish now

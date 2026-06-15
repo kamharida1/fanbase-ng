@@ -35,7 +35,7 @@ describe("resolveAppRole", () => {
 describe("getDefaultPathForRole", () => {
   it("returns role home paths", () => {
     expect(getDefaultPathForRole("user")).toBe("/feed");
-    expect(getDefaultPathForRole("creator")).toBe("/creator/dashboard");
+    expect(getDefaultPathForRole("creator")).toBe("/feed");
     expect(getDefaultPathForRole("admin")).toBe("/admin");
   });
 });

@@ -36,7 +36,7 @@ const STEPS: Step[] = [
   {
     id: "hasPost",
     title: "Publish your first post",
-    description: "Give subscribers something to enjoy right away.",
+    description: "It will appear on your feed and public profile for fans to see.",
     href: "/creator/content/new",
     cta: "Create post",
   },

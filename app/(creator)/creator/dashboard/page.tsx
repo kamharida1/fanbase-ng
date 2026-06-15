@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CreatePostPrompt } from "@/components/posts/create-post-prompt";
+import { PublicProfileCallout } from "@/components/creator/public-profile-callout";
 import { OnboardingChecklist } from "@/components/onboarding/onboarding-checklist";
 import { BalanceCards } from "@/components/wallet/balance-cards";
 import { TransactionList } from "@/components/wallet/transaction-list";
@@ -30,6 +31,10 @@ export default async function CreatorDashboardPage() {
       </div>
 
       <CreatePostPrompt />
+
+      {auth.profile.username ? (
+        <PublicProfileCallout username={auth.profile.username} />
+      ) : null}
 
       <OnboardingChecklist status={onboarding} />
 

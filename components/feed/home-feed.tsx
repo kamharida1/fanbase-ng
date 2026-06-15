@@ -18,12 +18,14 @@ export function HomeFeed({
   initialHasMore,
   viewerId,
   watermarkLabel,
+  hideEmptyState = false,
 }: {
   initialPosts: PostRow[];
   initialCursor: string | null;
   initialHasMore: boolean;
   viewerId?: string | null;
   watermarkLabel?: string | null;
+  hideEmptyState?: boolean;
 }) {
   const [posts, setPosts] = useState<PostRow[]>(initialPosts);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
@@ -86,15 +88,28 @@ export function HomeFeed({
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
-  if (posts.length === 0) {
+  if (posts.length === 0 && !hideEmptyState) {
     return (
-      <p className="text-muted-foreground">
-        Nothing here yet.{" "}
-        <Link href="/creators" className="underline">
-          Discover creators
-        </Link>{" "}
-        and subscribe to see their posts.
-      </p>
+      <div className="rounded-2xl border border-dashed bg-muted/20 px-6 py-12 text-center">
+        <p className="text-lg font-semibold">Your feed is quiet</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          Subscribe to creators or publish your own posts to fill this space.
+        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/discover"
+            className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+          >
+            Discover creators
+          </Link>
+          <Link
+            href="/creator/content/new"
+            className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium"
+          >
+            Create a post
+          </Link>
+        </div>
+      </div>
     );
   }
 

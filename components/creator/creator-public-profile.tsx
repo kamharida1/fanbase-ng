@@ -192,11 +192,21 @@ export function CreatorPublicProfile({
 
         {posts.length > 0 ? (
           <section className="mt-6 space-y-4">
-            <h2 className="text-xl font-semibold">
-              {activeCollectionId
-                ? (categories.find((c) => c.id === activeCollectionId)?.name ?? "Posts")
-                : "Posts"}
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-semibold">
+                {activeCollectionId
+                  ? (categories.find((c) => c.id === activeCollectionId)?.name ?? "Posts")
+                  : "Posts"}
+              </h2>
+              {isOwnProfile ? (
+                <Link
+                  href="/creator/content/new"
+                  className="text-sm font-medium text-primary underline underline-offset-4"
+                >
+                  New post
+                </Link>
+              ) : null}
+            </div>
             <div className="space-y-6">
               {posts.map((post) => (
                 <PostCard
@@ -208,7 +218,36 @@ export function CreatorPublicProfile({
               ))}
             </div>
           </section>
-        ) : null}
+        ) : (
+          <section className="mt-6">
+            <h2 className="text-xl font-semibold">Posts</h2>
+            <div className="mt-4 rounded-2xl border border-dashed bg-muted/20 px-6 py-12 text-center">
+              {isOwnProfile ? (
+                <>
+                  <p className="text-muted-foreground">
+                    Your published posts will show here for fans to browse.
+                  </p>
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                    <Link
+                      href="/creator/content/new"
+                      className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+                    >
+                      Create your first post
+                    </Link>
+                    <Link
+                      href="/creator/content"
+                      className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium"
+                    >
+                      Manage content
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <p className="text-muted-foreground">No posts published yet.</p>
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="mt-10">
           <h2 className="text-xl font-semibold">Subscription plans</h2>

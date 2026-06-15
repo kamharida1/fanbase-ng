@@ -13,6 +13,9 @@ export default async function CreatorContentPage() {
   if (!auth) redirect("/login?next=/creator/content");
 
   const posts = await listCreatorPosts(supabase, auth.userId);
+  const publicProfileHref = auth.profile.username
+    ? `/creators/${auth.profile.username}`
+    : null;
 
   return (
     <div className="space-y-6">
@@ -20,18 +23,28 @@ export default async function CreatorContentPage() {
         <div>
           <h1 className="text-2xl font-bold">Content</h1>
           <p className="mt-2 text-muted-foreground">
-            Text, images, videos — public, subscriber, tier, or PPV posts.
+            Manage posts that appear on your feed and public profile.
           </p>
         </div>
-        <Link
-          href="/creator/content/new"
-          className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-        >
-          New post
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {publicProfileHref ? (
+            <Link
+              href={publicProfileHref}
+              className="inline-flex h-10 items-center justify-center rounded-md border px-4 text-sm font-medium"
+            >
+              View profile
+            </Link>
+          ) : null}
+          <Link
+            href="/creator/content/new"
+            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+          >
+            New post
+          </Link>
+        </div>
       </div>
       <CreatePostPrompt />
-      <CreatorPostList posts={posts} />
+      <CreatorPostList posts={posts} publicProfileHref={publicProfileHref} />
     </div>
   );
 }

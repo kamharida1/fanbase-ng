@@ -56,6 +56,11 @@ export function isStreamConfigured(): boolean {
   return getStreamConfig() !== null;
 }
 
+/** At least one upload backend (R2 images/files or Stream video) is configured. */
+export function isMediaStorageConfigured(): boolean {
+  return isR2Configured() || isStreamConfigured();
+}
+
 // ── Content moderation (CSAM / explicit content) ──────────────────────────
 
 export type RekognitionConfig = {

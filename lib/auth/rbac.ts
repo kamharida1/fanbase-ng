@@ -60,7 +60,7 @@ export function getDefaultPathForRole(role: AppRole): string {
     case "moderator":
       return "/admin";
     case "creator":
-      return "/creator/dashboard";
+      return "/feed";
     default:
       return "/feed";
   }

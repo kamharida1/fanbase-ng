@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { ProfileEditor } from "@/components/creator/profile-editor";
+import { PublicProfileCallout } from "@/components/creator/public-profile-callout";
 import { VerificationRequestCard } from "@/components/creator/verification-request-card";
 import { normalizeSocialLinks } from "@/lib/creators/format";
 import { getCreatorStudioProfile } from "@/lib/creators/queries";
@@ -25,12 +28,25 @@ export default async function CreatorProfilePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Creator profile</h1>
-        <p className="mt-2 text-muted-foreground">
-          This is what fans see on your public page.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Creator profile</h1>
+          <p className="mt-2 text-muted-foreground">
+            This is what fans see on your public page.
+          </p>
+        </div>
+        {studio.profile?.username ? (
+          <Link
+            href={`/creators/${studio.profile.username}`}
+            className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium"
+          >
+            View public profile
+          </Link>
+        ) : null}
       </div>
+      {studio.profile?.username ? (
+        <PublicProfileCallout username={studio.profile.username} />
+      ) : null}
       <ProfileEditor
         userId={auth.userId}
         username={studio.profile?.username ?? auth.profile.username}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { APP_NAME } from "@/config/constants";
+import { MarketingNav } from "@/components/layout/marketing-nav";
 
 export default function MarketingLayout({
   children,
@@ -10,30 +11,7 @@ export default function MarketingLayout({
   return (
     <div className="flex min-h-screen min-w-0 flex-col overflow-x-clip">
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-sm">
-        <nav className="mx-auto flex max-w-6xl min-w-0 flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <Link href="/" className="shrink-0 text-lg font-bold tracking-tight">
-            {APP_NAME}
-          </Link>
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-3 sm:gap-6">
-            <Link
-              href="/creators"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Explore creators
-            </Link>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <Link href="/login" className="text-sm font-medium">
-                Sign in
-              </Link>
-              <Link
-                href="/signup"
-                className="inline-flex h-9 shrink-0 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-              >
-                Get started
-              </Link>
-            </div>
-          </div>
-        </nav>
+        <MarketingNav />
       </header>
 
       <div className="min-w-0 flex-1">{children}</div>

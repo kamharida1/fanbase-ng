@@ -1,9 +1,12 @@
+import Link from "next/link";
+
 import { HorizontalNav } from "@/components/layout/horizontal-nav";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { RoleBadge } from "@/components/auth/role-badge";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { APP_NAME } from "@/config/constants";
 import { cn } from "@/lib/utils";
-import type { AuthContext } from "@/types/auth";
+import type { AppRole, AuthContext } from "@/types/auth";
 
 type NavLink = { href: string; label: string };
 
@@ -33,11 +36,23 @@ export function AuthShell({
   const rootClass =
     variant === "admin" ? "min-h-screen bg-muted/30" : "min-h-screen";
 
+  const homeHref = getHomeHrefForRole(auth.appRole);
+
   return (
     <div className={cn(rootClass, "overflow-x-clip")}>
       <header className={headerClass}>
         <nav className="mx-auto flex max-w-6xl min-w-0 flex-col gap-4 px-4 sm:px-6">
-          <HorizontalNav items={nav} />
+          <div className="flex min-w-0 items-center gap-4">
+            <Link
+              href={homeHref}
+              className="shrink-0 text-lg font-bold tracking-tight"
+            >
+              {APP_NAME}
+            </Link>
+            <div className="min-w-0 flex-1">
+              <HorizontalNav items={nav} />
+            </div>
+          </div>
           <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm sm:gap-3">
             <NotificationBell userId={auth.userId} />
             <RoleBadge role={auth.appRole} />
@@ -71,14 +86,17 @@ export const FAN_NAV: NavLink[] = [
   { href: "/settings", label: "Settings" },
 ];
 
+/** Browse-first links shared by fans and creators, then creator studio tools. */
 export const CREATOR_NAV: NavLink[] = [
+  { href: "/feed", label: "Feed" },
+  { href: "/discover", label: "Discover" },
   { href: "/creator/dashboard", label: "Dashboard" },
-  { href: "/creator/content/new", label: "+ New post" },
-  { href: "/creator/live", label: "🔴 Go Live" },
+  { href: "/creator/content", label: "Content" },
+  { href: "/creator/content/new", label: "New post" },
+  { href: "/creator/profile", label: "Profile" },
+  { href: "/creator/live", label: "Go Live" },
   { href: "/creator/broadcast", label: "Broadcast" },
   { href: "/creator/fans", label: "Fans" },
-  { href: "/creator/profile", label: "Profile" },
-  { href: "/creator/content", label: "Content" },
   { href: "/creator/vault", label: "Vault" },
   { href: "/creator/tiers", label: "Tiers" },
   { href: "/creator/analytics", label: "Analytics" },
@@ -89,3 +107,19 @@ export const CREATOR_NAV: NavLink[] = [
   { href: "/referrals", label: "Refer & earn" },
   { href: "/settings", label: "Settings" },
 ];
+
+export function getHomeHrefForRole(role: AppRole): string {
+  switch (role) {
+    case "super_admin":
+    case "admin":
+    case "moderator":
+      return "/admin";
+    case "creator":
+    default:
+      return "/feed";
+  }
+}
+
+export function getShellNavForRole(role: AppRole): NavLink[] {
+  return role === "creator" ? CREATOR_NAV : FAN_NAV;
+}

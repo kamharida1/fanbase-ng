@@ -97,3 +97,47 @@ export async function uploadFileWithPresign(input: {
     streamUid: presign.provider === "stream" ? presign.streamUid : undefined,
   });
 }
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Re-hit confirm while backend finishes virus scan / binding. */
+export async function pollUploadUntilReady(
+  uploadId: string,
+  options?: { streamUid?: string; maxAttempts?: number; intervalMs?: number },
+): Promise<ConfirmUploadResponse> {
+  const maxAttempts = options?.maxAttempts ?? 40;
+  const intervalMs = options?.intervalMs ?? 1500;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const result = await confirmMediaUpload({
+      uploadId,
+      streamUid: options?.streamUid,
+    });
+
+    if (result.status === "ready") {
+      return result;
+    }
+
+    if (result.status === "rejected" || result.status === "failed") {
+      throw new Error("Upload was rejected during security processing.");
+    }
+
+    if (attempt < maxAttempts - 1) {
+      await sleep(intervalMs);
+    }
+  }
+
+  throw new Error(
+    "Upload is still processing. Wait for the green checkmark before publishing.",
+  );
+}
+
+export function humanizeUploadError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Upload failed.";
+  if (message.includes("Media storage is not configured")) {
+    return "Photo and video uploads are not set up on this server yet. Try a text post or contact support.";
+  }
+  return message;
+}

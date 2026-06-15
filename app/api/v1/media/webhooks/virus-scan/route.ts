@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { feedCacheTag } from "@/lib/feed/queries";
 import { getMediaWebhookSecret } from "@/lib/media/config";
 import { verifyWebhookSecret } from "@/lib/media/crypto";
 import { virusScanWebhookSchema } from "@/lib/media/schemas";
@@ -48,6 +50,23 @@ export async function POST(request: Request) {
 
     if (parsed.data.status === "clean") {
       await finalizeUploadAfterScan(admin, parsed.data.uploadId);
+    }
+
+    if (upload.context === "post" && upload.owner_id) {
+      revalidatePath("/creator/content");
+      revalidatePath("/feed");
+      revalidatePath("/discover");
+      revalidateTag(feedCacheTag(upload.owner_id));
+
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("username")
+        .eq("id", upload.owner_id)
+        .maybeSingle();
+
+      if (profile?.username) {
+        revalidatePath(`/creators/${profile.username}`);
+      }
     }
 
     await writeAuditLog(admin, {

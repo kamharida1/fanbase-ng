@@ -10,6 +10,7 @@ import { pinPost, unpinPost } from "@/lib/posts/moderation";
 import { startPpvPurchase } from "@/lib/posts/ppv";
 import { formatNgnFromKobo } from "@/lib/creators/format";
 import { PollWidget } from "@/components/posts/poll-widget";
+import { PostStatusBadge } from "@/components/posts/post-status-badge";
 import { MediaWatermark } from "@/components/posts/media-watermark";
 import { ShareIconButton } from "@/components/shared/share-button";
 import { ReportButton } from "@/components/shared/report-button";
@@ -184,6 +185,9 @@ export function PostCard({
             Pinned
           </span>
         )}
+        {isOwnProfile && post.moderation_status === "pending" ? (
+          <PostStatusBadge post={post} />
+        ) : null}
         {isOwnProfile && post.status === "published" && (
           <button
             type="button"

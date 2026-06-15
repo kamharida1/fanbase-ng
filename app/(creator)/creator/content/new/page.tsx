@@ -1,5 +1,7 @@
 import { PostEditor } from "@/components/posts/post-editor";
+import { MediaStorageNotice } from "@/components/media/media-storage-notice";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
+import { isMediaStorageConfigured } from "@/lib/media/config";
 import { listCreatorCategories } from "@/lib/vault/queries";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -20,9 +22,13 @@ export default async function NewPostPage() {
   ]);
 
   return (
-    <PostEditor
-      plans={(plans ?? []).map((p) => ({ id: p.id, name: p.name }))}
-      categories={categories}
-    />
+    <div className="space-y-6">
+      {!isMediaStorageConfigured() ? <MediaStorageNotice /> : null}
+      <PostEditor
+        plans={(plans ?? []).map((p) => ({ id: p.id, name: p.name }))}
+        categories={categories}
+        mediaStorageConfigured={isMediaStorageConfigured()}
+      />
+    </div>
   );
 }

@@ -11,6 +11,7 @@ import { logger } from "@/lib/logger";
 import { cursorFromRow, decodeFeedCursor, encodeFeedCursor } from "@/lib/feed/cursor";
 import { enrichPosts } from "@/lib/posts/queries";
 import type { FeedPage } from "@/types/feed";
+import type { PostRow } from "@/types/posts";
 
 type RankedFeedRow = {
   id: string;
@@ -93,6 +94,18 @@ async function buildFeedPage(
     fanId,
   );
 
+  let mergedPosts = posts;
+  if (!cursorEncoded) {
+    const pendingOwn = await listCreatorOwnPendingFeedPosts(supabase, fanId);
+    if (pendingOwn.length > 0) {
+      const seen = new Set(posts.map((p) => p.id));
+      mergedPosts = [
+        ...pendingOwn.filter((p) => !seen.has(p.id)),
+        ...posts,
+      ];
+    }
+  }
+
   const last = pageRows[pageRows.length - 1];
   const nextCursor =
     hasMore && last
@@ -105,7 +118,27 @@ async function buildFeedPage(
         )
       : null;
 
-  return { posts, nextCursor, hasMore };
+  return { posts: mergedPosts, nextCursor, hasMore };
+}
+
+async function listCreatorOwnPendingFeedPosts(
+  supabase: SupabaseClient,
+  creatorId: string,
+  limit = 10,
+): Promise<PostRow[]> {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("creator_id", creatorId)
+    .eq("status", "published")
+    .eq("moderation_status", "pending")
+    .is("removed_at", null)
+    .order("published_at", { ascending: false })
+    .limit(limit);
+
+  if (error || !data?.length) return [];
+
+  return enrichPosts(supabase, data, creatorId);
 }
 
 export async function getHomeFeedPage(
