@@ -54,6 +54,15 @@ export async function requestVerification(
 
   if (error) return { success: false, error: error.message };
 
+  try {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const { tryAutoApproveKyc } = await import("@/lib/kyc/auto-approve");
+    await tryAutoApproveKyc(admin, auth.userId);
+  } catch {
+    // Manual review still works if automation is unavailable.
+  }
+
   revalidatePath("/creator/profile");
   return { success: true };
 }

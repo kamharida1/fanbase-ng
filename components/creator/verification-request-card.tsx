@@ -44,7 +44,8 @@ export function VerificationRequestCard({ kycStatus, rejectedReason, existingNot
           <div>
             <h2 className="font-semibold">Verification under review</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              We received your request and will review it within 3–5 business days.
+              We received your request. Eligible creators are verified instantly;
+              otherwise we review within 1 business day.
             </p>
           </div>
         </div>

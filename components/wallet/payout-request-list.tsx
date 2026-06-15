@@ -1,4 +1,4 @@
-import { formatNgnFromKobo, payoutStatusLabel } from "@/lib/wallets/format";
+import { formatNgnFromKobo, payoutStatusDescription, payoutStatusLabel } from "@/lib/wallets/format";
 import type { PayoutRequestRow } from "@/types/wallet";
 
 function formatWhen(iso: string): string {
@@ -33,9 +33,16 @@ export function PayoutRequestList({ requests }: { requests: PayoutRequestRow[] }
               <p className="text-xs text-destructive">{req.failure_reason}</p>
             ) : null}
           </div>
-          <span className="text-sm font-medium capitalize">
-            {payoutStatusLabel(req.status)}
-          </span>
+          <div className="sm:text-right">
+            <p className="text-sm font-medium capitalize">
+              {payoutStatusLabel(req.status)}
+            </p>
+            {payoutStatusDescription(req.status) ? (
+              <p className="mt-1 text-xs text-muted-foreground sm:max-w-xs sm:ml-auto">
+                {payoutStatusDescription(req.status)}
+              </p>
+            ) : null}
+          </div>
         </li>
       ))}
     </ul>

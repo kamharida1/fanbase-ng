@@ -1,4 +1,5 @@
 import { BalanceCards } from "@/components/wallet/balance-cards";
+import { PayoutRequirementsNotice } from "@/components/wallet/payout-requirements-notice";
 import { PayoutAccountForm } from "@/components/wallet/payout-account-form";
 import { PayoutAccountsList } from "@/components/wallet/payout-accounts-list";
 import { PayoutRequestList } from "@/components/wallet/payout-request-list";
@@ -22,6 +23,16 @@ export default async function CreatorWithdrawalsPage() {
   const accounts = await listPayoutAccounts(supabase, auth.userId);
   const requests = await listPayoutRequests(supabase, auth.userId);
 
+  const { data: profileRow } = await supabase
+    .from("profiles")
+    .select("kyc_status")
+    .eq("id", auth.userId)
+    .single();
+
+  const kycStatus =
+    (profileRow?.kyc_status as "none" | "pending" | "verified" | "rejected") ??
+    "none";
+
   let banks: Awaited<ReturnType<typeof listNigerianBanks>> = [];
   try {
     banks = await listNigerianBanks();
@@ -37,6 +48,8 @@ export default async function CreatorWithdrawalsPage() {
           Request payouts to verified Nigerian bank accounts.
         </p>
       </div>
+
+      <PayoutRequirementsNotice kycStatus={kycStatus} />
 
       <BalanceCards wallet={wallet} />
 

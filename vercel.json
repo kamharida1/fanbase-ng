@@ -9,6 +9,14 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/internal/cron/process-payout-automation",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/internal/cron/process-kyc-automation",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/internal/cron/publish-scheduled-posts",
       "schedule": "* * * * *"
     },

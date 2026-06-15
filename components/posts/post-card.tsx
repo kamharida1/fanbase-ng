@@ -8,9 +8,10 @@ import { AlertTriangle, Heart, Lock, Pin, PinOff } from "lucide-react";
 import { togglePostLike } from "@/lib/posts/actions";
 import { pinPost, unpinPost } from "@/lib/posts/moderation";
 import { startPpvPurchase } from "@/lib/posts/ppv";
-import { formatNgnFromKobo } from "@/lib/creators/format";
+import { getLockedPostMessage } from "@/lib/posts/visibility";
 import { PollWidget } from "@/components/posts/poll-widget";
 import { PostStatusBadge } from "@/components/posts/post-status-badge";
+import { PostVisibilityBadge } from "@/components/posts/post-visibility-badge";
 import { MediaWatermark } from "@/components/posts/media-watermark";
 import { ShareIconButton } from "@/components/shared/share-button";
 import { ReportButton } from "@/components/shared/report-button";
@@ -120,6 +121,7 @@ export function PostCard({
   const label = author?.display_name ?? author?.username ?? "Creator";
   const locked = !post.can_view_full;
   const isPpv = post.visibility === "ppv";
+  const lockMessage = locked ? getLockedPostMessage(post) : null;
   const showWarning = Boolean(post.content_warning) && !locked && !warningDismissed;
   const showWatermark =
     Boolean(watermarkLabel) && !isOwnProfile && !locked && post.visibility !== "public";
@@ -174,11 +176,9 @@ export function PostCard({
           <p className="truncate font-medium">{label}</p>
           <p className="truncate text-xs text-muted-foreground">
             @{author?.username} · {formatWhen(post.published_at)}
-            {post.visibility !== "public" ? (
-              <> · {post.visibility.replace("_", " ")}</>
-            ) : null}
           </p>
         </div>
+        <PostVisibilityBadge visibility={post.visibility} locked={locked} />
         {pinned && (
           <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
             <Pin className="h-3 w-3" />
@@ -235,18 +235,19 @@ export function PostCard({
             )}
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/60 p-4 text-center">
               <Lock className="h-8 w-8" />
-              <p className="font-medium">
-                {isPpv && post.ppv_price_kobo
-                  ? `Unlock for ${formatNgnFromKobo(post.ppv_price_kobo)}`
-                  : "Subscribers only"}
-              </p>
+              <div>
+                <p className="font-medium">{lockMessage?.title}</p>
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                  {lockMessage?.detail}
+                </p>
+              </div>
               {isPpv && post.ppv_price_kobo ? (
                 <Button size="sm" disabled={loading} onClick={() => void handleUnlock()}>
                   Unlock post
                 </Button>
               ) : post.author?.username ? (
                 <Button size="sm" asChild>
-                  <Link href={`/creators/${post.author.username}`}>Subscribe to view</Link>
+                  <Link href={`/creators/${post.author.username}`}>View subscription options</Link>
                 </Button>
               ) : null}
             </div>

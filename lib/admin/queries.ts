@@ -140,6 +140,19 @@ export async function listAdminCreators(
   return { creators, total: count ?? 0 };
 }
 
+export async function countStalePendingPublishedPosts(
+  admin: SupabaseClient,
+): Promise<number> {
+  const { count, error } = await admin
+    .from("posts")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "published")
+    .eq("moderation_status", "pending");
+
+  if (error) return 0;
+  return count ?? 0;
+}
+
 export async function listModerationQueue(
   admin: SupabaseClient,
   limit = 50,

@@ -24,3 +24,15 @@ export function walletTxLabel(type: string): string {
 export function payoutStatusLabel(status: string): string {
   return status.replace(/_/g, " ");
 }
+
+export function payoutStatusDescription(status: string): string | null {
+  const map: Record<string, string> = {
+    pending: "Waiting to start processing.",
+    review: "Needs a quick manual review before Paystack sends it.",
+    processing: "Approved and being sent to your bank via Paystack.",
+    completed: "Sent to your bank account.",
+    failed: "Could not be completed. Funds were returned to your balance.",
+    cancelled: "Cancelled and funds returned to your balance.",
+  };
+  return map[status] ?? null;
+}

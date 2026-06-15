@@ -350,7 +350,7 @@ async function handleTransferSuccess(
     })
     .eq("paystack_transfer_code", transferCode)
     .eq("status", "processing") // idempotency: skip if already completed
-    .select("id, creator_id, net_amount_kobo")
+    .select("id, creator_id, net_amount_kobo, amount_kobo")
     .single();
 
   if (error || !payout) return;
@@ -369,6 +369,7 @@ async function handleTransferSuccess(
     await notifyPayoutProcessed(admin, {
       creatorId: payout.creator_id,
       payoutRequestId: payout.id,
+      amountKobo: payout.amount_kobo,
     });
   } catch (err) {
     logger.warn("notifications.payout_completed_failed", { err, payoutId: payout.id });
@@ -400,7 +401,7 @@ async function handleTransferFailure(
     })
     .eq("paystack_transfer_code", transferCode)
     .eq("status", "processing") // idempotency guard
-    .select("id, creator_id, wallet_id, net_amount_kobo")
+    .select("id, creator_id, wallet_id, amount_kobo, net_amount_kobo")
     .single();
 
   if (error || !payout) return;
@@ -409,7 +410,7 @@ async function handleTransferFailure(
   // can request another withdrawal. Done as a separate ledger transaction.
   await admin.rpc("credit_wallet_on_payout_failure", {
     p_wallet_id: payout.wallet_id,
-    p_amount_kobo: payout.net_amount_kobo,
+    p_amount_kobo: payout.amount_kobo,
     p_payout_request_id: payout.id,
   });
 
@@ -435,4 +436,16 @@ async function handleTransferFailure(
     event,
     reason: failureReason,
   });
+
+  try {
+    const { notifyPayoutFailed } = await import("@/lib/notifications/emit");
+    await notifyPayoutFailed(admin, {
+      creatorId: payout.creator_id,
+      payoutRequestId: payout.id,
+      amountKobo: payout.amount_kobo,
+      reason: failureReason,
+    });
+  } catch (err) {
+    logger.warn("notifications.payout_failed_failed", { err, payoutId: payout.id });
+  }
 }

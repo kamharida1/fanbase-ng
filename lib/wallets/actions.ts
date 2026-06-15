@@ -258,6 +258,9 @@ export async function requestWithdrawal(
       payoutRequestId: requestId as string,
       amountKobo,
     });
+
+    const { routePayoutRequest } = await import("@/lib/wallets/payout-processor");
+    await routePayoutRequest(admin, { requestId: requestId as string });
   } catch {
     // Best-effort audit when service role is unavailable locally.
   }

@@ -450,17 +450,225 @@ export async function notifyPayoutProcessed(
   input: {
     creatorId: string;
     payoutRequestId: string;
+    amountKobo?: number;
   },
 ): Promise<void> {
+  const amountText = input.amountKobo
+    ? formatNgnFromKobo(input.amountKobo)
+    : "your withdrawal";
+
   await createNotification(admin, {
     userId: input.creatorId,
     type: "new_payout",
     title: "Payout sent",
-    body: "Your withdrawal has been sent to your bank account.",
+    body: `${amountText} has been sent to your bank account.`,
     actionUrl: buildAppActionUrl("/creator/withdrawals"),
     entityType: "payout_requests",
     entityId: input.payoutRequestId,
     idempotencyKey: `payout:${input.payoutRequestId}:completed`,
+  });
+
+  if (input.amountKobo) {
+    const { subject, html } = payoutEmail({
+      creatorName: "",
+      amountKobo: input.amountKobo,
+      status: "approved",
+    });
+    fireEmail(
+      sendEmailNotification(admin, {
+        userId: input.creatorId,
+        notificationType: "new_payout",
+        subject,
+        html,
+      }),
+      "new_payout",
+    );
+  }
+}
+
+export async function notifyPayoutProcessing(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    payoutRequestId: string;
+    amountKobo: number;
+    source: "admin" | "auto";
+  },
+): Promise<void> {
+  const amount = formatNgnFromKobo(input.amountKobo);
+  const body =
+    input.source === "auto"
+      ? `Your withdrawal of ${amount} was approved automatically and is being sent to your bank via Paystack.`
+      : `Your withdrawal of ${amount} was approved and is being sent to your bank via Paystack.`;
+
+  await createNotification(admin, {
+    userId: input.creatorId,
+    type: "new_payout",
+    title: "Payout processing",
+    body,
+    actionUrl: buildAppActionUrl("/creator/withdrawals"),
+    entityType: "payout_requests",
+    entityId: input.payoutRequestId,
+    metadata: { amount_kobo: input.amountKobo, source: input.source },
+    idempotencyKey: `payout:${input.payoutRequestId}:processing`,
+  });
+}
+
+export async function notifyPayoutReviewQueued(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    payoutRequestId: string;
+    amountKobo: number;
+    reason: string;
+  },
+): Promise<void> {
+  const amount = formatNgnFromKobo(input.amountKobo);
+
+  await createNotification(admin, {
+    userId: input.creatorId,
+    type: "new_payout",
+    title: "Withdrawal queued for review",
+    body: `${amount} is waiting for a quick manual check. ${input.reason} We usually complete these within 1 business day.`,
+    actionUrl: buildAppActionUrl("/creator/withdrawals"),
+    entityType: "payout_requests",
+    entityId: input.payoutRequestId,
+    metadata: { amount_kobo: input.amountKobo },
+    idempotencyKey: `payout:${input.payoutRequestId}:review`,
+  });
+}
+
+export async function notifyPayoutFailed(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    payoutRequestId: string;
+    amountKobo: number;
+    reason: string;
+  },
+): Promise<void> {
+  const amount = formatNgnFromKobo(input.amountKobo);
+
+  await createNotification(admin, {
+    userId: input.creatorId,
+    type: "new_payout",
+    title: "Payout failed",
+    body: `Your withdrawal of ${amount} could not be completed. ${input.reason} The funds were returned to your available balance.`,
+    actionUrl: buildAppActionUrl("/creator/withdrawals"),
+    entityType: "payout_requests",
+    entityId: input.payoutRequestId,
+    metadata: { amount_kobo: input.amountKobo, reason: input.reason },
+    idempotencyKey: `payout:${input.payoutRequestId}:failed`,
+  });
+
+  const { subject, html } = payoutEmail({
+    creatorName: "",
+    amountKobo: input.amountKobo,
+    status: "rejected",
+    failureReason: input.reason,
+  });
+  fireEmail(
+    sendEmailNotification(admin, {
+      userId: input.creatorId,
+      notificationType: "new_payout",
+      subject,
+      html,
+    }),
+    "new_payout",
+  );
+}
+
+export async function notifyPayoutRejected(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    payoutRequestId: string;
+    amountKobo: number;
+    reason: string;
+  },
+): Promise<void> {
+  const amount = formatNgnFromKobo(input.amountKobo);
+
+  await createNotification(admin, {
+    userId: input.creatorId,
+    type: "new_payout",
+    title: "Withdrawal not approved",
+    body: `${amount} was not sent. ${input.reason} The funds were returned to your available balance.`,
+    actionUrl: buildAppActionUrl("/creator/withdrawals"),
+    entityType: "payout_requests",
+    entityId: input.payoutRequestId,
+    metadata: { amount_kobo: input.amountKobo, reason: input.reason },
+    idempotencyKey: `payout:${input.payoutRequestId}:rejected`,
+  });
+
+  const { subject, html } = payoutEmail({
+    creatorName: "",
+    amountKobo: input.amountKobo,
+    status: "rejected",
+    failureReason: input.reason,
+  });
+  fireEmail(
+    sendEmailNotification(admin, {
+      userId: input.creatorId,
+      notificationType: "new_payout",
+      subject,
+      html,
+    }),
+    "new_payout",
+  );
+}
+
+export async function notifyPayoutDelayed(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    payoutRequestId: string;
+    amountKobo: number;
+    status: string;
+  },
+): Promise<void> {
+  const amount = formatNgnFromKobo(input.amountKobo);
+  const dayKey = new Date().toISOString().slice(0, 10);
+  const statusLabel =
+    input.status === "processing"
+      ? "is still being sent by Paystack"
+      : input.status === "review"
+        ? "is waiting for manual review"
+        : "is still being processed";
+
+  await createNotification(admin, {
+    userId: input.creatorId,
+    type: "new_payout",
+    title: "Withdrawal update",
+    body: `Your withdrawal of ${amount} ${statusLabel}. No action is needed — we'll notify you when it completes.`,
+    actionUrl: buildAppActionUrl("/creator/withdrawals"),
+    entityType: "payout_requests",
+    entityId: input.payoutRequestId,
+    metadata: { amount_kobo: input.amountKobo, status: input.status },
+    idempotencyKey: `payout_delay:${input.payoutRequestId}:${dayKey}`,
+  });
+}
+
+export async function notifyWalletCleared(
+  admin: SupabaseClient,
+  input: {
+    creatorId: string;
+    amountKobo: number;
+    transactionId: string;
+  },
+): Promise<void> {
+  const amount = formatNgnFromKobo(input.amountKobo);
+
+  await createNotification(admin, {
+    userId: input.creatorId,
+    type: "new_payout",
+    title: "Earnings cleared",
+    body: `${amount} moved from pending to your available balance and can now be withdrawn.`,
+    actionUrl: buildAppActionUrl("/creator/withdrawals"),
+    entityType: "wallet_transactions",
+    entityId: input.transactionId,
+    metadata: { amount_kobo: input.amountKobo },
+    idempotencyKey: `wallet_cleared:${input.transactionId}`,
   });
 }
 

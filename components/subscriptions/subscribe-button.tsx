@@ -99,7 +99,9 @@ export function SubscribeButton({
       </Button>
       {error ? (
         <p className="mt-2 text-sm text-destructive" role="alert">
-          {error}
+          {error.includes("pending checkout session")
+            ? "You already started checkout for this creator. Complete that payment or wait up to 24 hours before trying again."
+            : error}
         </p>
       ) : null}
     </div>

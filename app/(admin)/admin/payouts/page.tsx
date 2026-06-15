@@ -14,8 +14,8 @@ export default async function AdminPayoutsPage() {
       <div>
         <h1 className="text-2xl font-bold">Payout approvals</h1>
         <p className="mt-2 text-muted-foreground">
-          Approve or reject creator withdrawal requests. Rejected payouts return
-          funds to the creator wallet.
+          Low-risk withdrawals are sent automatically via Paystack. Larger or
+          flagged requests stay here for manual approval.
         </p>
       </div>
       <PayoutsPanel payouts={payouts} />

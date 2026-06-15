@@ -20,6 +20,7 @@ import {
 } from "@/lib/notifications/emit";
 import { resolveDispute } from "@/lib/payments/disputes";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { processPayoutTransfer } from "@/lib/wallets/payout-processor";
 
 export type AdminActionResult =
   | { success: true }
@@ -259,11 +260,79 @@ export async function adminModeratePost(
     });
 
     revalidateAdmin();
+    revalidatePath("/feed");
+    revalidatePath("/discover");
     return { success: true };
   } catch (err) {
     return {
       success: false,
       error: err instanceof Error ? err.message : "Moderation failed.",
+    };
+  }
+}
+
+export async function adminApproveStalePendingPosts(): Promise<
+  AdminActionResult & { approved?: number }
+> {
+  try {
+    const ctx = await requireAdminStaff("moderator");
+    const admin = createAdminClient();
+    const adminUserId = await getAdminUserId(admin, ctx.userId);
+
+    const { data: posts, error: fetchError } = await admin
+      .from("posts")
+      .select("id")
+      .eq("status", "published")
+      .eq("moderation_status", "pending")
+      .limit(500);
+
+    if (fetchError) return { success: false, error: fetchError.message };
+    if (!posts?.length) return { success: true, approved: 0 };
+
+    const postIds = posts.map((p) => p.id);
+    const now = new Date().toISOString();
+
+    const { error: updateError } = await admin
+      .from("posts")
+      .update({ moderation_status: "approved", updated_at: now })
+      .in("id", postIds);
+
+    if (updateError) return { success: false, error: updateError.message };
+
+    await admin
+      .from("moderation_queue")
+      .update({ status: "approved" })
+      .eq("entity_type", "post")
+      .in("entity_id", postIds);
+
+    if (adminUserId) {
+      await admin.from("moderation_actions").insert(
+        postIds.map((postId) => ({
+          moderator_id: adminUserId,
+          action: "approve",
+          entity_type: "post",
+          entity_id: postId,
+          reason: "Bulk approved stale backlog",
+        })),
+      );
+    }
+
+    await logAdminAction(admin, {
+      actorId: ctx.userId,
+      action: "admin.posts.backlog_approved",
+      entityType: "posts",
+      entityId: postIds[0] ?? "bulk",
+      afterState: { approved_count: postIds.length },
+    });
+
+    revalidateAdmin();
+    revalidatePath("/feed");
+    revalidatePath("/discover");
+    return { success: true, approved: postIds.length };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Bulk approval failed.",
     };
   }
 }
@@ -333,18 +402,36 @@ export async function adminReviewPayout(
     }
 
     if (parsed.data.action === "approve") {
-      const { error } = await admin.rpc("admin_approve_payout_request", {
-        p_request_id: parsed.data.requestId,
-        p_admin_user_id: adminUserId,
+      const result = await processPayoutTransfer(admin, {
+        requestId: parsed.data.requestId,
+        adminUserId,
+        source: "admin",
       });
-      if (error) return { success: false, error: error.message };
+      if (!result.ok) return { success: false, error: result.error };
     } else {
+      const reason = parsed.data.reason ?? "Rejected by admin";
+      const { data: payout } = await admin
+        .from("payout_requests")
+        .select("creator_id, amount_kobo")
+        .eq("id", parsed.data.requestId)
+        .maybeSingle();
+
       const { error } = await admin.rpc("admin_reject_payout_request", {
         p_request_id: parsed.data.requestId,
         p_admin_user_id: adminUserId,
-        p_reason: parsed.data.reason ?? "Rejected by admin",
+        p_reason: reason,
       });
       if (error) return { success: false, error: error.message };
+
+      if (payout) {
+        const { notifyPayoutRejected } = await import("@/lib/notifications/emit");
+        await notifyPayoutRejected(admin, {
+          creatorId: payout.creator_id,
+          payoutRequestId: parsed.data.requestId,
+          amountKobo: payout.amount_kobo,
+          reason,
+        }).catch(() => {});
+      }
     }
 
     await logAdminAction(admin, {
