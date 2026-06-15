@@ -202,7 +202,11 @@ export function PostEditor({
         prev.map((g) => g.localId === item.localId ? { ...g, status: "uploading" } : g),
       );
       try {
-        let result = await uploadFileWithPresign({ context: "post", contextRefId: id, file });
+        let result = await uploadFileWithPresign({
+          context: "post",
+          contextRefId: id,
+          file: item.file,
+        });
         if (result.status === "scanning") {
           setGallery((prev) =>
             prev.map((g) => g.localId === item.localId ? { ...g, status: "scanning" } : g),

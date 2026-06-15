@@ -4,11 +4,11 @@ import type { PostRow } from "@/types/posts";
 type BadgeTone = "neutral" | "success" | "warning" | "muted";
 
 function toneForPost(post: PostRow): BadgeTone {
+  if (post.scheduled_publish_at && post.status === "draft") return "warning";
   if (post.status === "draft") return "muted";
   if (post.status === "archived") return "muted";
   if (post.moderation_status === "pending") return "warning";
   if (post.moderation_status === "rejected") return "neutral";
-  if (post.scheduled_publish_at && post.status === "draft") return "warning";
   return "success";
 }
 
