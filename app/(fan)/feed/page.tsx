@@ -49,7 +49,7 @@ export default async function FeedPage({ searchParams }: PageProps) {
   ]);
 
   const feedIsEmpty = page.posts.length === 0;
-  const isCreator = auth.appRole === "creator";
+  const isCreator = auth.profile.role === "creator";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">

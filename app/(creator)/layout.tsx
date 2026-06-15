@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 
-import { AuthShell, CREATOR_NAV } from "@/components/auth/auth-shell";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { CreatorBottomNav } from "@/components/layout/bottom-nav";
+import { getNavForAuth } from "@/lib/auth/nav";
 import { requireRole } from "@/lib/auth/get-auth-context";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,7 +15,11 @@ export default async function CreatorLayout({
   const auth = await requireRole(supabase, "creator");
 
   return (
-    <AuthShell auth={auth} nav={CREATOR_NAV} bottomNav={<CreatorBottomNav />}>
+    <AuthShell
+      auth={auth}
+      nav={getNavForAuth(auth, { preferCreatorNav: true })}
+      bottomNav={<CreatorBottomNav />}
+    >
       {children}
     </AuthShell>
   );

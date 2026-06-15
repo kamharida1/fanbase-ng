@@ -1,11 +1,13 @@
-import { redirect } from "next/navigation";
-
-export const dynamic = "force-dynamic";
-
-import { AuthShell, getShellNavForRole } from "@/components/auth/auth-shell";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { CreatorBottomNav, FanBottomNav } from "@/components/layout/bottom-nav";
+import {
+  getNavForAuth,
+  usesCreatorBottomNav,
+} from "@/lib/auth/nav";
 import { requireRole } from "@/lib/auth/get-auth-context";
 import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
 
 export default async function FanLayout({
   children,
@@ -15,20 +17,12 @@ export default async function FanLayout({
   const supabase = await createClient();
   const auth = await requireRole(supabase, "user");
 
-  if (
-    auth.appRole === "moderator" ||
-    auth.appRole === "admin" ||
-    auth.appRole === "super_admin"
-  ) {
-    redirect("/admin/moderation");
-  }
-
   return (
     <AuthShell
       auth={auth}
-      nav={getShellNavForRole(auth.appRole)}
+      nav={getNavForAuth(auth)}
       bottomNav={
-        auth.appRole === "creator" ? (
+        usesCreatorBottomNav(auth) ? (
           <CreatorBottomNav />
         ) : (
           <FanBottomNav />

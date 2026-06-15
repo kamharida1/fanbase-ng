@@ -8,7 +8,7 @@ export type AdminNavItem = {
 };
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
-  { href: "/admin", label: "Dashboard", minRole: "moderator" },
+  { href: "/admin", label: "Admin", minRole: "moderator" },
   { href: "/admin/moderation", label: "Content", minRole: "moderator" },
   { href: "/admin/reports", label: "Reports", minRole: "moderator" },
   { href: "/admin/users", label: "Users", minRole: "admin" },

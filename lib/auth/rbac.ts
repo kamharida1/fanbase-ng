@@ -56,14 +56,17 @@ export function getDefaultPathForRole(role: AppRole): string {
   switch (role) {
     case "super_admin":
     case "admin":
-      return "/admin";
     case "moderator":
-      return "/admin";
+      return "/feed";
     case "creator":
       return "/feed";
     default:
       return "/feed";
   }
+}
+
+export function isStaffRole(role: AppRole): boolean {
+  return role === "moderator" || role === "admin" || role === "super_admin";
 }
 
 export const ROUTE_MIN_ROLE = {

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 import { AuthShell } from "@/components/auth/auth-shell";
-import { getAdminNavForRole } from "@/lib/auth/admin-nav";
+import { getNavForAuth } from "@/lib/auth/nav";
 import { requireRole } from "@/lib/auth/get-auth-context";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,13 +20,8 @@ export default async function AdminLayout({
     redirect("/feed");
   }
 
-  const nav = getAdminNavForRole(auth.appRole).map((item) => ({
-    href: item.href,
-    label: item.label,
-  }));
-
   return (
-    <AuthShell auth={auth} nav={nav} variant="admin">
+    <AuthShell auth={auth} nav={getNavForAuth(auth)} variant="admin">
       {children}
     </AuthShell>
   );

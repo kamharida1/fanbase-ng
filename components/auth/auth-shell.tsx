@@ -5,8 +5,9 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { RoleBadge } from "@/components/auth/role-badge";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { APP_NAME } from "@/config/constants";
+import { getHomeHrefForAuth } from "@/lib/auth/nav";
 import { cn } from "@/lib/utils";
-import type { AppRole, AuthContext } from "@/types/auth";
+import type { AuthContext } from "@/types/auth";
 
 type NavLink = { href: string; label: string };
 
@@ -36,7 +37,7 @@ export function AuthShell({
   const rootClass =
     variant === "admin" ? "min-h-screen bg-muted/30" : "min-h-screen";
 
-  const homeHref = getHomeHrefForRole(auth.appRole);
+  const homeHref = getHomeHrefForAuth(auth);
 
   return (
     <div className={cn(rootClass, "overflow-x-clip")}>
@@ -108,18 +109,9 @@ export const CREATOR_NAV: NavLink[] = [
   { href: "/settings", label: "Settings" },
 ];
 
-export function getHomeHrefForRole(role: AppRole): string {
-  switch (role) {
-    case "super_admin":
-    case "admin":
-    case "moderator":
-      return "/admin";
-    case "creator":
-    default:
-      return "/feed";
-  }
-}
-
-export function getShellNavForRole(role: AppRole): NavLink[] {
-  return role === "creator" ? CREATOR_NAV : FAN_NAV;
+export function getShellNavForRole(
+  role: AuthContext["appRole"],
+  profileRole: AuthContext["profile"]["role"] = "fan",
+): NavLink[] {
+  return profileRole === "creator" ? CREATOR_NAV : FAN_NAV;
 }

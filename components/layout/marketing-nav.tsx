@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
-import { getHomeHrefForRole } from "@/components/auth/auth-shell";
+import { getHomeHrefForAuth } from "@/lib/auth/nav";
+import { isStaffRole } from "@/lib/auth/rbac";
 import { APP_NAME } from "@/config/constants";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
 import { createClient } from "@/lib/supabase/server";
@@ -20,10 +21,10 @@ export async function MarketingNav() {
         {auth ? (
           <>
             <Link
-              href={getHomeHrefForRole(auth.appRole)}
+              href={getHomeHrefForAuth(auth)}
               className="text-sm font-medium transition-colors hover:text-foreground"
             >
-              {auth.appRole === "creator" ? "Feed" : "Home"}
+              Feed
             </Link>
             <Link
               href="/discover"
@@ -31,12 +32,20 @@ export async function MarketingNav() {
             >
               Discover
             </Link>
-            {auth.appRole === "creator" ? (
+            {auth.profile.role === "creator" ? (
               <Link
                 href="/creator/dashboard"
                 className="text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 Studio
+              </Link>
+            ) : null}
+            {isStaffRole(auth.appRole) ? (
+              <Link
+                href="/admin"
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Admin
               </Link>
             ) : null}
             <SignOutButton />
