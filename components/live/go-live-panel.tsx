@@ -86,7 +86,7 @@ export function GoLivePanel({ existing }: Props) {
     const { streamId, cloudflareUid } = state;
 
     pollRef.current = setInterval(async () => {
-      const { connected } = await pollLiveStreamStatus(cloudflareUid);
+      const { connected } = await pollLiveStreamStatus(streamId);
       if (connected) {
         stopPolling();
         await markStreamLive(streamId);

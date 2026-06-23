@@ -42,7 +42,8 @@ export async function createLiveInput(input: {
   title: string;
   creatorId: string;
 }): Promise<LiveInputResult> {
-  const customerCode = process.env.CLOUDFLARE_STREAM_CUSTOMER_CODE ?? "";
+  const customerCode = process.env.CLOUDFLARE_STREAM_CUSTOMER_CODE;
+  if (!customerCode) throw new Error("CLOUDFLARE_STREAM_CUSTOMER_CODE is not set.");
 
   const result = await liveApi<{
     uid: string;

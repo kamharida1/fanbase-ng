@@ -536,14 +536,8 @@ export async function handleStreamWebhook(
       input.thumbnail ??
       `https://videodelivery.net/${input.streamUid}/thumbnails/thumbnail.jpg`;
 
-    await admin
-      .from("post_media")
-      .update({ processing_status: "ready", thumbnail_url: thumbnailUrl })
-      .eq("media_upload_id", row.id);
-
-    // Scan the first-frame thumbnail as a proxy for the full video.
-    // Full async video moderation (Rekognition Video API) requires the video
-    // to live in an S3 bucket and is deferred as a future enhancement.
+    // Run content scan before marking post_media ready — blocked videos must
+    // not surface to fans even briefly.
     const contentResult = await runContentScanFromUrl(admin, thumbnailUrl);
     const { blocked } = await applyContentScanResult(admin, row, contentResult);
 
@@ -552,8 +546,17 @@ export async function handleStreamWebhook(
         .from("media_uploads")
         .update({ status: "rejected" })
         .eq("id", row.id);
+      await admin
+        .from("post_media")
+        .update({ processing_status: "failed", thumbnail_url: thumbnailUrl })
+        .eq("media_upload_id", row.id);
       return;
     }
+
+    await admin
+      .from("post_media")
+      .update({ processing_status: "ready", thumbnail_url: thumbnailUrl })
+      .eq("media_upload_id", row.id);
 
     if (row.status === "scanning" && row.scan_status === "pending") {
       await applyVirusScanResult(admin, {
