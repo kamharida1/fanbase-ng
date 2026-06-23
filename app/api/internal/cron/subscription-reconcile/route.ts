@@ -5,7 +5,7 @@ import { verifyCronBearer } from "@/lib/security/cron-auth";
 import { expireEndedSubscriptions } from "@/lib/subscriptions/lifecycle";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   if (!verifyCronBearer(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

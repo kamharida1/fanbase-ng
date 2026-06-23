@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyScheduledPostPublished } from "@/lib/notifications/emit";
+import { verifyCronBearer } from "@/lib/security/cron-auth";
 
-export async function POST() {
+export async function GET(request: Request) {
+  if (!verifyCronBearer(request.headers.get("authorization"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const admin = createAdminClient();
 

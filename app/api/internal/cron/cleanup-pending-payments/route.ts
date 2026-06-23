@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // sessions expire after 1 hour; we give 24h of slack before marking them).
 const ABANDON_AFTER_HOURS = 24;
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   if (!verifyCronBearer(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 const BATCH_SIZE = 50;
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   if (!verifyCronBearer(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

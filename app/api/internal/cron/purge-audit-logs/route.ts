@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // Privacy policy states audit logs are kept for 24 months.
 const RETENTION_MONTHS = 24;
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   if (!verifyCronBearer(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

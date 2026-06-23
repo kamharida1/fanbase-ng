@@ -10,7 +10,7 @@ function anonymizedUsername(userId: string): string {
   return `deleted-${userId.replace(/-/g, "").slice(0, 12)}`;
 }
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   if (!verifyCronBearer(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

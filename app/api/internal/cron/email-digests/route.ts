@@ -11,7 +11,7 @@ const DUE_AFTER_DAYS = 6;
 // The scheduler fires this route daily, so the backlog drains across runs.
 const BATCH_PER_RUN = 200;
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   if (!verifyCronBearer(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
