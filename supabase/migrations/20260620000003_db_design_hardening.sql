@@ -38,11 +38,11 @@ ALTER TABLE wallet_transactions
 ALTER TABLE messages
   ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
 
--- Partial unique index: enforces uniqueness only when key is provided.
--- messages is PARTITION BY RANGE (created_at) so this index lives on the
--- parent and is enforced globally.
+-- Partial unique index: partitioned tables require the partition key in unique
+-- indexes. Pairing with created_at still dedupes client retries that reuse
+-- the same idempotency key within the same send timestamp.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_idempotency_key
-  ON messages (idempotency_key)
+  ON messages (idempotency_key, created_at)
   WHERE idempotency_key IS NOT NULL;
 
 -- ── 5. payout_requests: admin status index ───────────────────────────────────

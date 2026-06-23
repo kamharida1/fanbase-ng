@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import { MessagingInbox } from "@/components/messaging/messaging-inbox";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
+import { isStaffRole } from "@/lib/auth/rbac";
 import { buildWatermarkLabel } from "@/lib/media/watermark";
 import {
   countPendingRequests,
@@ -79,6 +80,7 @@ export default async function CreatorMessagesPage({ searchParams }: PageProps) {
           watermarkLabel={watermarkLabel}
           callerUsername={auth.profile.username}
           callerDisplayName={auth.profile.display_name}
+          hideRequestLimits={isStaffRole(auth.appRole)}
         />
       </Suspense>
     </div>

@@ -24,6 +24,7 @@ export function MessageThread({
   role,
   watermarkLabel,
   onStartCall,
+  hideRequestLimits = false,
 }: {
   conversation: ConversationRow;
   initialMessages: MessageRow[];
@@ -31,6 +32,7 @@ export function MessageThread({
   role: "fan" | "creator";
   watermarkLabel?: string | null;
   onStartCall?: (callType: CallType) => void;
+  hideRequestLimits?: boolean;
 }) {
   const router = useRouter();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -96,7 +98,9 @@ export function MessageThread({
   const title = other?.display_name ?? other?.username ?? "Chat";
 
   const composerHint =
-    conversation.status === "pending" && role === "fan"
+    !hideRequestLimits &&
+    conversation.status === "pending" &&
+    role === "fan"
       ? "You can send one intro message while your request is pending."
       : undefined;
 
@@ -146,6 +150,7 @@ export function MessageThread({
         status={conversation.status}
         hint={composerHint}
         disabled={conversation.status === "declined"}
+        hideRequestLimits={hideRequestLimits}
       />
     </div>
   );

@@ -43,6 +43,7 @@ export function MessagingInbox({
   watermarkLabel,
   callerUsername,
   callerDisplayName,
+  hideRequestLimits = false,
 }: {
   initialInbox: ConversationRow[];
   initialRequests: ConversationRow[];
@@ -54,6 +55,7 @@ export function MessagingInbox({
   watermarkLabel?: string | null;
   callerUsername: string;
   callerDisplayName?: string | null;
+  hideRequestLimits?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -409,6 +411,7 @@ export function MessagingInbox({
                 role={role}
                 watermarkLabel={watermarkLabel}
                 onStartCall={handleStartCall}
+                hideRequestLimits={hideRequestLimits}
               />
             </>
           ) : (

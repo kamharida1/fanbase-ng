@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAuth } from "@/lib/auth/get-auth-context";
+import { isStaffRole } from "@/lib/auth/rbac";
 import { getAccountAge } from "@/lib/auth/account-age";
 import {
   canFanMessageCreator,
@@ -21,6 +22,7 @@ import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { MediaUploadRow } from "@/types/media";
+import type { ConversationStatus } from "@/types/messaging";
 
 export type ActionResult<T = void> =
   | { success: true; data?: T }
@@ -29,6 +31,32 @@ export type ActionResult<T = void> =
 function revalidateMessagingPaths() {
   revalidatePath("/messages");
   revalidatePath("/creator/messages");
+}
+
+async function acceptConversationForStaff(
+  conversationId: string,
+  currentStatus: ConversationStatus,
+): Promise<ConversationStatus> {
+  if (currentStatus !== "pending") return currentStatus;
+
+  const admin = createAdminClient();
+  const acceptedAt = new Date().toISOString();
+  const { error } = await admin
+    .from("conversations")
+    .update({
+      status: "accepted",
+      accepted_at: acceptedAt,
+      updated_at: acceptedAt,
+    })
+    .eq("id", conversationId)
+    .eq("status", "pending");
+
+  if (error) {
+    console.error("[messaging] staff auto-accept failed", error);
+    return currentStatus;
+  }
+
+  return "accepted";
 }
 
 export async function startConversationWithCreator(
@@ -44,6 +72,7 @@ export async function startConversationWithCreator(
 
   const supabase = await createClient();
   const auth = await requireAuth(supabase);
+  const isStaff = isStaffRole(auth.appRole);
 
   const allowed = await canFanMessageCreator(
     supabase,
@@ -56,7 +85,7 @@ export async function startConversationWithCreator(
 
   // New accounts (< 24h) may only initiate conversations with creators they subscribe to.
   const { isNew } = await getAccountAge(supabase, auth.userId);
-  if (isNew) {
+  if (isNew && !isStaff) {
     const { count } = await supabase
       .from("subscriptions")
       .select("id", { count: "exact", head: true })
@@ -98,6 +127,10 @@ export async function startConversationWithCreator(
     return { success: false, error: error.message };
   }
 
+  if (isStaff) {
+    await acceptConversationForStaff(data as string, "pending");
+  }
+
   revalidateMessagingPaths();
   return { success: true, data: { conversationId: data as string } };
 }
@@ -132,13 +165,23 @@ export async function sendMessage(
     return { success: false, error: "Forbidden." };
   }
 
+  const isStaff = isStaffRole(auth.appRole);
+  let conversationStatus = conv.status as ConversationStatus;
+  if (isStaff && conversationStatus === "pending") {
+    conversationStatus = await acceptConversationForStaff(
+      conv.id,
+      conversationStatus,
+    );
+  }
+
   const sendCheck = await canSendMessageInConversation(supabase, {
     conversationId: conv.id,
     senderId: auth.userId,
     fanId: conv.fan_id,
     creatorId: conv.creator_id,
-    status: conv.status,
+    status: conversationStatus,
     isBlocked: conv.is_blocked_by_creator || conv.is_blocked_by_fan,
+    isStaff,
   });
 
   if (!sendCheck.allowed) {

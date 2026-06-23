@@ -14,11 +14,13 @@ export function MessageComposer({
   status,
   disabled,
   hint,
+  hideRequestLimits = false,
 }: {
   conversationId: string;
   status: ConversationStatus;
   disabled?: boolean;
   hint?: string;
+  hideRequestLimits?: boolean;
 }) {
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(false);
@@ -79,7 +81,7 @@ export function MessageComposer({
       {hint ? (
         <p className="mb-2 text-xs text-muted-foreground">{hint}</p>
       ) : null}
-      {status === "pending" ? (
+      {status === "pending" && !hideRequestLimits ? (
         <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">
           Message request — limited messages until accepted.
         </p>

@@ -53,6 +53,8 @@ export async function canSendMessageInConversation(
     creatorId: string;
     status: ConversationStatus;
     isBlocked?: boolean;
+    /** Staff (moderator/admin) bypass message-request intro limits. */
+    isStaff?: boolean;
   },
 ): Promise<{ allowed: boolean; reason?: string }> {
   const { conversationId, senderId, fanId, creatorId, status } = input;
@@ -63,6 +65,10 @@ export async function canSendMessageInConversation(
 
   if (input.isBlocked) {
     return { allowed: false, reason: "Messaging is blocked." };
+  }
+
+  if (input.isStaff) {
+    return { allowed: true };
   }
 
   if (status === "accepted") {
