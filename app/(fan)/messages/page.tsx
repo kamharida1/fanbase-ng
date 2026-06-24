@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import { MessagingInbox } from "@/components/messaging/messaging-inbox";
 import { StartConversationForm } from "@/components/messaging/start-conversation-form";
+import { VerifyCheckout } from "@/components/subscriptions/verify-checkout";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
 import { isStaffRole } from "@/lib/auth/rbac";
 import { buildWatermarkLabel } from "@/lib/media/watermark";
@@ -14,7 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 type PageProps = {
-  searchParams: Promise<{ c?: string; tab?: string }>;
+  searchParams: Promise<{ c?: string; tab?: string; ppv?: string; reference?: string }>;
 };
 
 export default async function FanMessagesPage({ searchParams }: PageProps) {
@@ -28,6 +29,7 @@ export default async function FanMessagesPage({ searchParams }: PageProps) {
   });
 
   const params = await searchParams;
+  const successRedirect = params.c ? `/messages?c=${params.c}` : "/messages";
   const inbox = await listConversations(supabase, auth.userId, "fan", "inbox");
 
   let selectedConversation = null;
@@ -56,6 +58,12 @@ export default async function FanMessagesPage({ searchParams }: PageProps) {
         <p className="mt-2 text-muted-foreground">
           Direct messages with creators. New chats start as message requests.
         </p>
+        {params.ppv === "success" && params.reference ? (
+          <VerifyCheckout
+            reference={params.reference}
+            successRedirect={successRedirect}
+          />
+        ) : null}
       </div>
 
       {inbox.length === 0 && !params.c ? (

@@ -76,7 +76,7 @@ export function CreatorPublicProfile({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="h-full w-full bg-gradient-to-br from-neutral-200 to-neutral-400 dark:from-neutral-800 dark:to-neutral-600" />
+          <div className="h-full w-full bg-gradient-to-br from-muted to-primary/20" />
         )}
       </div>
 
@@ -171,12 +171,18 @@ export function CreatorPublicProfile({
         ) : null}
 
         {liveStream ? (
-          <section className="mt-10">
+          <section className="mt-10 space-y-2">
             <LivePlayer
               embedUrl={liveStream.embedUrl}
               title={liveStream.title}
               creatorName={creator.display_name ?? creator.username}
             />
+            <Link
+              href={`/live/${creator.username}`}
+              className="text-sm font-medium text-primary underline underline-offset-4"
+            >
+              Watch full stream with chat
+            </Link>
           </section>
         ) : null}
 

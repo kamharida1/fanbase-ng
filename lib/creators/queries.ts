@@ -34,12 +34,38 @@ function getProfileSnippet(
   return Array.isArray(profiles) ? profiles[0] : profiles;
 }
 
-export async function listCreators(
-  supabase: SupabaseClient,
-  options?: { limit?: number; search?: string; category?: string },
-): Promise<CreatorListItem[]> {
-  const limit = options?.limit ?? 24;
+type CreatorPageCursor = { createdAt: string; userId: string };
 
+export function encodeCreatorCursor(cursor: CreatorPageCursor): string {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+export function decodeCreatorCursor(
+  encoded: string | null | undefined,
+): CreatorPageCursor | null {
+  if (!encoded?.trim()) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(encoded, "base64url").toString("utf8"),
+    ) as CreatorPageCursor;
+    if (typeof parsed.createdAt !== "string" || typeof parsed.userId !== "string") {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function queryCreators(
+  supabase: SupabaseClient,
+  options: {
+    limit: number;
+    search?: string;
+    category?: string;
+    cursor?: CreatorPageCursor | null;
+  },
+): Promise<(CreatorJoinRow & { created_at: string })[]> {
   let query = supabase
     .from("creator_profiles")
     .select(
@@ -48,6 +74,7 @@ export async function listCreators(
       bio,
       is_verified,
       category,
+      created_at,
       profiles!inner (
         username,
         display_name,
@@ -62,14 +89,16 @@ export async function listCreators(
     .eq("profiles.status", "active")
     .is("profiles.deleted_at", null)
     .eq("is_accepting_subscribers", true)
-    .limit(limit);
+    .order("created_at", { ascending: false })
+    .order("user_id", { ascending: false })
+    .limit(options.limit);
 
   // Category filter — uses GIN index on creator_profiles.category
-  if (options?.category) {
+  if (options.category) {
     query = query.contains("category", [options.category]);
   }
 
-  const searchTerm = options?.search?.trim()
+  const searchTerm = options.search?.trim()
     ? sanitizePostgrestIlikeTerm(options.search.trim())
     : null;
   if (searchTerm) {
@@ -79,10 +108,21 @@ export async function listCreators(
     );
   }
 
+  if (options.cursor) {
+    query = query.or(
+      `created_at.lt.${options.cursor.createdAt},and(created_at.eq.${options.cursor.createdAt},user_id.lt.${options.cursor.userId})`,
+    );
+  }
+
   const { data, error } = await query;
-
   if (error || !data) return [];
+  return data as unknown as (CreatorJoinRow & { created_at: string })[];
+}
 
+async function hydrateCreators(
+  supabase: SupabaseClient,
+  data: (CreatorJoinRow & { created_at: string })[],
+): Promise<CreatorListItem[]> {
   const userIds = data.map((row) => row.user_id);
   const { data: planStats } = await supabase
     .from("subscription_plans")
@@ -128,6 +168,45 @@ export async function listCreators(
       categories: (row as { category?: string[] }).category ?? [],
     };
   });
+}
+
+export async function listCreators(
+  supabase: SupabaseClient,
+  options?: { limit?: number; search?: string; category?: string },
+): Promise<CreatorListItem[]> {
+  const data = await queryCreators(supabase, {
+    limit: options?.limit ?? 24,
+    search: options?.search,
+    category: options?.category,
+  });
+  return hydrateCreators(supabase, data);
+}
+
+export async function listCreatorsPage(
+  supabase: SupabaseClient,
+  options: { limit?: number; search?: string; category?: string; cursor?: string | null },
+): Promise<{ creators: CreatorListItem[]; nextCursor: string | null; hasMore: boolean }> {
+  const limit = options.limit ?? 24;
+  const cursor = decodeCreatorCursor(options.cursor);
+
+  const rows = await queryCreators(supabase, {
+    limit: limit + 1,
+    search: options.search,
+    category: options.category,
+    cursor,
+  });
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const creators = await hydrateCreators(supabase, pageRows);
+
+  const last = pageRows[pageRows.length - 1];
+  const nextCursor =
+    hasMore && last
+      ? encodeCreatorCursor({ createdAt: last.created_at, userId: last.user_id })
+      : null;
+
+  return { creators, nextCursor, hasMore };
 }
 
 export async function getCreatorByUsername(

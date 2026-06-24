@@ -140,6 +140,134 @@ export async function setDefaultPayoutAccount(
   return { success: true };
 }
 
+export async function cancelWithdrawal(
+  payoutRequestId: string,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const auth = await requireAuth(supabase);
+
+  if (auth.profile.role !== "creator") {
+    return { success: false, error: "Creator account required." };
+  }
+
+  const { data: request } = await supabase
+    .from("payout_requests")
+    .select("id, creator_id, wallet_id, amount_kobo, status")
+    .eq("id", payoutRequestId)
+    .eq("creator_id", auth.userId)
+    .maybeSingle();
+
+  if (!request) {
+    return { success: false, error: "Withdrawal request not found." };
+  }
+  if (request.status !== "pending") {
+    return {
+      success: false,
+      error: "Only withdrawals awaiting processing can be cancelled.",
+    };
+  }
+
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+
+  const { error: updateError } = await admin
+    .from("payout_requests")
+    .update({
+      status: "cancelled",
+      processed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", payoutRequestId)
+    .eq("status", "pending");
+
+  if (updateError) {
+    return { success: false, error: updateError.message };
+  }
+
+  const { error: refundError } = await admin.rpc(
+    "credit_wallet_on_payout_failure",
+    {
+      p_wallet_id: request.wallet_id,
+      p_amount_kobo: request.amount_kobo,
+      p_payout_request_id: payoutRequestId,
+    },
+  );
+
+  if (refundError) {
+    logger.error("wallet.cancel_withdrawal_refund_failed", {
+      err: refundError,
+      payoutRequestId,
+    });
+    return { success: false, error: "Cancelled, but the refund failed. Contact support." };
+  }
+
+  await writeAuditLog(admin, {
+    actorId: auth.userId,
+    actorType: "user",
+    action: "wallet.payout_cancelled",
+    entityType: "payout_requests",
+    entityId: payoutRequestId,
+  });
+
+  revalidateWalletPaths();
+  return { success: true };
+}
+
+export async function deletePayoutAccount(
+  accountId: string,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const auth = await requireAuth(supabase);
+
+  if (auth.profile.role !== "creator") {
+    return { success: false, error: "Creator account required." };
+  }
+
+  const { data: account } = await supabase
+    .from("payout_accounts")
+    .select("id, creator_id")
+    .eq("id", accountId)
+    .eq("creator_id", auth.userId)
+    .maybeSingle();
+
+  if (!account) {
+    return { success: false, error: "Bank account not found." };
+  }
+
+  const { data: activeRequest } = await supabase
+    .from("payout_requests")
+    .select("id")
+    .eq("payout_account_id", accountId)
+    .in("status", ["pending", "review", "processing"])
+    .maybeSingle();
+
+  if (activeRequest) {
+    return {
+      success: false,
+      error: "Can't remove a bank account with a withdrawal in progress.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("payout_accounts")
+    .delete()
+    .eq("id", accountId)
+    .eq("creator_id", auth.userId);
+
+  if (error) {
+    if (error.code === "23503") {
+      return {
+        success: false,
+        error: "This account has payout history and can't be removed.",
+      };
+    }
+    return { success: false, error: error.message };
+  }
+
+  revalidateWalletPaths();
+  return { success: true };
+}
+
 export async function requestWithdrawal(
   input: unknown,
 ): Promise<ActionResult<{ requestId: string }>> {

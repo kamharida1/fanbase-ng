@@ -98,38 +98,38 @@ export default async function HomePage() {
   return (
     <main>
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-slate-950 px-4 py-20 text-white sm:px-6 sm:py-36">
+      <section className="relative overflow-hidden bg-background px-4 py-20 text-foreground sm:px-6 sm:py-36">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 -z-10"
           style={{
             background:
-              "radial-gradient(ellipse 90% 60% at 50% -5%, oklch(0.45 0.18 260 / 0.6), transparent)",
+              "radial-gradient(ellipse 90% 60% at 50% -5%, oklch(0.68 0.15 231 / 0.35), transparent)",
           }}
         />
         <div className="mx-auto max-w-4xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-slate-400">
+          <p className="text-sm font-semibold uppercase tracking-widest text-primary">
             The Nigerian creator economy
           </p>
           <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-6xl">
             Support Nigerian creators{" "}
-            <span className="text-slate-300">you love</span>
+            <span className="text-muted-foreground">you love</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-300">
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
             {APP_DESCRIPTION} Subscribe monthly, unlock pay-per-view posts, and
             message your favourite creators — all in Naira.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/signup"
-              className="inline-flex h-12 items-center gap-2 rounded-lg bg-white px-8 text-base font-semibold text-slate-950 transition-colors hover:bg-slate-100"
+              className="inline-flex h-12 items-center gap-2 rounded-full bg-primary px-8 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Get started free
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
             <Link
               href="/creators"
-              className="inline-flex h-12 items-center rounded-lg border border-white/20 px-8 text-base font-medium text-white transition-colors hover:bg-white/10"
+              className="inline-flex h-12 items-center rounded-full border border-border px-8 text-base font-medium text-foreground transition-colors hover:bg-accent"
             >
               Explore creators
             </Link>
@@ -260,24 +260,24 @@ export default async function HomePage() {
       )}
 
       {/* ── Creator CTA ───────────────────────────────────────────────────── */}
-      <section className="bg-slate-950 px-4 py-20 text-white sm:px-6 sm:py-24">
+      <section className="bg-card px-4 py-20 text-foreground sm:px-6 sm:py-24">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
             Ready to start earning?
           </h2>
-          <p className="mx-auto mt-5 max-w-lg text-lg text-slate-300">
+          <p className="mx-auto mt-5 max-w-lg text-lg text-muted-foreground">
             Join {APP_NAME} today. Set up your creator page in minutes and start
             monetising your audience — withdraw earnings to your Nigerian bank
             account whenever you want.
           </p>
           <Link
             href="/signup"
-            className="mt-8 inline-flex h-12 items-center gap-2 rounded-lg bg-white px-8 text-base font-semibold text-slate-950 transition-colors hover:bg-slate-100"
+            className="mt-8 inline-flex h-12 items-center gap-2 rounded-full bg-primary px-8 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Create your page
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
-          <p className="mt-4 text-sm text-slate-500">
+          <p className="mt-4 text-sm text-muted-foreground">
             Free to join. Keep {CREATOR_KEEP_PCT}% of everything you earn.
           </p>
         </div>

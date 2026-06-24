@@ -39,9 +39,10 @@ export function VerifyCheckout({
         const json = (await res.json()) as {
           data?: {
             status: string;
-            kind?: "subscription" | "ppv";
+            kind?: "subscription" | "ppv" | "message_ppv";
             subscriptionId?: string;
             postId?: string;
+            messageId?: string;
             reason?: string;
             message?: string;
           };

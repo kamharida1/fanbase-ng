@@ -40,4 +40,5 @@ export type MessageRow = {
   created_at: string;
   read_by_other?: boolean;
   attachment_url?: string | null;
+  unlocked?: boolean;
 };

@@ -11,6 +11,7 @@ import {
 import type { PaystackWebhookBody } from "@/lib/paystack/types";
 import { processDisputeWebhook } from "@/lib/payments/disputes";
 import { fulfillPpvPurchase } from "@/lib/payments/ppv-processor";
+import { fulfillMessagePpvPurchase } from "@/lib/payments/message-ppv-processor";
 import {
   failSubscriptionPayment,
   fulfillSubscriptionPayment,
@@ -89,6 +90,12 @@ async function handleChargeSuccess(
     await handleRecurringChargeSuccess(admin, data, requestId);
     return;
   }
+
+  const messagePpvHandled = await fulfillMessagePpvPurchase(admin, {
+    chargeData: data,
+    requestId,
+  });
+  if (messagePpvHandled) return;
 
   const ppvHandled = await fulfillPpvPurchase(admin, {
     chargeData: data,

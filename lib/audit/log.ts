@@ -36,6 +36,7 @@ export type AuditAction =
   | "wallet.payout_requested"
   | "wallet.payout_completed"
   | "wallet.payout_failed"
+  | "wallet.payout_cancelled"
   | "wallet.reversed_refund"
   | "media.upload.confirmed"
   | "media.scan.completed"

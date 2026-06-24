@@ -1,4 +1,5 @@
 import { HomeFeed } from "@/components/feed/home-feed";
+import { FeedComposer } from "@/components/feed/feed-composer";
 import { FeedEmptyGuide } from "@/components/feed/feed-empty-guide";
 import { SuggestedCreators } from "@/components/recommendations/suggested-creators";
 import { StoryStrip } from "@/components/feed/story-strip";
@@ -9,7 +10,9 @@ import { getHomeFeedPage } from "@/lib/feed/queries";
 import { getRecommendedCreators } from "@/lib/recommendations/queries";
 import { getStoryGroups } from "@/lib/stories/queries";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
+import { isMediaStorageConfigured } from "@/lib/media/config";
 import { buildWatermarkLabel } from "@/lib/media/watermark";
+import { listCreatorCategories } from "@/lib/vault/queries";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -28,7 +31,9 @@ export default async function FeedPage({ searchParams }: PageProps) {
     userId: auth.userId,
   });
 
-  const [storyGroups, page, suggestedCreators] = await Promise.all([
+  const isCreator = auth.profile.role === "creator";
+
+  const [storyGroups, page, suggestedCreators, composerData] = await Promise.all([
     getStoryGroups(supabase, auth.userId),
     (async () => {
       try {
@@ -46,10 +51,20 @@ export default async function FeedPage({ searchParams }: PageProps) {
       }
     })(),
     getRecommendedCreators(supabase, auth.userId, 8),
+    isCreator
+      ? Promise.all([
+          supabase
+            .from("subscription_plans")
+            .select("id, name")
+            .eq("creator_id", auth.userId)
+            .eq("is_active", true)
+            .order("sort_order"),
+          listCreatorCategories(supabase, auth.userId),
+        ])
+      : Promise.resolve(null),
   ]);
 
   const feedIsEmpty = page.posts.length === 0;
-  const isCreator = auth.profile.role === "creator";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -78,8 +93,18 @@ export default async function FeedPage({ searchParams }: PageProps) {
         ) : null}
       </div>
 
-      {storyGroups.length > 0 ? (
-        <StoryStrip groups={storyGroups} />
+      {storyGroups.length > 0 || isCreator ? (
+        <StoryStrip groups={storyGroups} canAddStory={isCreator} />
+      ) : null}
+
+      {isCreator && composerData ? (
+        <FeedComposer
+          avatarUrl={null}
+          displayName={auth.profile.display_name ?? auth.profile.username ?? "You"}
+          plans={(composerData[0].data ?? []).map((p) => ({ id: p.id, name: p.name }))}
+          categories={composerData[1]}
+          mediaStorageConfigured={isMediaStorageConfigured()}
+        />
       ) : null}
 
       {feedIsEmpty ? (

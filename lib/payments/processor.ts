@@ -20,6 +20,7 @@ export type PaymentRow = {
   type: string | null;
   subscription_id: string | null;
   post_id: string | null;
+  message_id: string | null;
   creator_id: string | null;
   metadata: Record<string, unknown>;
 };
@@ -31,7 +32,7 @@ export async function getPaymentByReference(
   const { data } = await admin
     .from("payments")
     .select(
-      "id, payer_id, paystack_reference, amount_kobo, status, type, subscription_id, post_id, creator_id, metadata",
+      "id, payer_id, paystack_reference, amount_kobo, status, type, subscription_id, post_id, message_id, creator_id, metadata",
     )
     .eq("paystack_reference", reference)
     .maybeSingle();

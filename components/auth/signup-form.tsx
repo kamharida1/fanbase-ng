@@ -121,6 +121,11 @@ export function SignupForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {refCode ? (
+        <p className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
+          You were invited with code <span className="font-semibold">{refCode}</span> — sign up to claim your referral bonus.
+        </p>
+      ) : null}
       {/* Honeypot: hidden from real users, bots that fill every field trip this */}
       <div
         aria-hidden="true"

@@ -132,6 +132,7 @@ async function listCreatorOwnPendingFeedPosts(
     .eq("creator_id", creatorId)
     .eq("status", "published")
     .eq("moderation_status", "pending")
+    .eq("is_story", false)
     .is("removed_at", null)
     .order("published_at", { ascending: false })
     .limit(limit);

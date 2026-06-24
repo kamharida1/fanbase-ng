@@ -156,11 +156,29 @@ export async function listMessages(
     (reads ?? []).map((r) => `${r.message_id}:${r.message_created_at}`),
   );
 
+  const ppvMessageIds = data.filter((m) => m.is_ppv).map((m) => m.id);
+  const purchasedSet = new Set<string>();
+  if (ppvMessageIds.length > 0) {
+    const { data: purchases } = await supabase
+      .from("message_purchases")
+      .select("message_id, message_created_at")
+      .eq("fan_id", input.userId)
+      .in("message_id", ppvMessageIds);
+    (purchases ?? []).forEach((p) =>
+      purchasedSet.add(`${p.message_id}:${p.message_created_at}`),
+    );
+  }
+
   const rows: MessageRow[] = [];
 
   for (const m of data) {
+    const unlocked =
+      !m.is_ppv ||
+      m.sender_id === input.userId ||
+      purchasedSet.has(`${m.id}:${m.created_at}`);
+
     let attachmentUrl: string | null = null;
-    if (m.media_r2_key || m.media_upload_id) {
+    if (unlocked && (m.media_r2_key || m.media_upload_id)) {
       attachmentUrl = await resolveMessageAttachmentUrl(supabase, {
         viewerId: input.userId,
         mediaUploadId: m.media_upload_id,
@@ -172,8 +190,8 @@ export async function listMessages(
       id: m.id,
       conversation_id: m.conversation_id,
       sender_id: m.sender_id,
-      body: m.body,
-      media_r2_key: m.media_r2_key,
+      body: unlocked ? m.body : null,
+      media_r2_key: unlocked ? m.media_r2_key : null,
       attachment_type: m.attachment_type,
       attachment_mime: m.attachment_mime,
       attachment_filename: m.attachment_filename,
@@ -185,6 +203,7 @@ export async function listMessages(
         m.sender_id === input.userId &&
         readSet.has(`${m.id}:${m.created_at}`),
       attachment_url: attachmentUrl,
+      unlocked,
     });
   }
 

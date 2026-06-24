@@ -13,7 +13,7 @@ const csp = [
   `img-src 'self' data: blob: https://${supabaseHost} https://*.supabase.co https://*.r2.cloudflarestorage.com https://videodelivery.net`,
   `connect-src 'self' https://${supabaseHost} https://*.supabase.co wss://${supabaseHost} wss://*.supabase.co https://api.paystack.co https://*.sentry.io https://*.r2.cloudflarestorage.com https://*.cloudflarestream.com https://*.videodelivery.net`,
   `media-src 'self' https://*.r2.cloudflarestorage.com https://videodelivery.net`,
-  "frame-src https://checkout.paystack.com",
+  "frame-src https://checkout.paystack.com https://*.cloudflarestream.com https://iframe.videodelivery.net",
   "font-src 'self' data:",
   "object-src 'none'",
   "base-uri 'self'",
@@ -51,6 +51,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.supabase.co" },
       { protocol: "https", hostname: "videodelivery.net" },
       { protocol: "https", hostname: "**.r2.cloudflarestorage.com" },
+      { protocol: "https", hostname: "fanbaseng.com" },
     ],
   },
   experimental: {

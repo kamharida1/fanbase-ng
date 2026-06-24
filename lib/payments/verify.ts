@@ -4,6 +4,7 @@ import { writeAuditLog } from "@/lib/audit/log";
 import { verifyPaystackTransaction } from "@/lib/paystack/transactions";
 import { chargeAmountMatchesPayment } from "@/lib/security/payment-amount";
 import { fulfillPpvPurchase } from "@/lib/payments/ppv-processor";
+import { fulfillMessagePpvPurchase } from "@/lib/payments/message-ppv-processor";
 import {
   failSubscriptionPayment,
   fulfillSubscriptionPayment,
@@ -25,6 +26,13 @@ export type VerifyPaymentResult =
       paymentId: string;
       reference: string;
     }
+  | {
+      status: "success";
+      kind: "message_ppv";
+      messageId: string;
+      paymentId: string;
+      reference: string;
+    }
   | { status: "pending"; reference: string; message: string }
   | { status: "failed"; reference: string; reason: string }
   | { status: "not_found"; reference: string }
@@ -35,9 +43,19 @@ function isPpvPayment(payment: {
   post_id?: string | null;
   metadata: Record<string, unknown>;
 }): boolean {
+  if (payment.metadata?.purpose === "message_ppv_purchase") return false;
   if (payment.type === "ppv") return true;
   const meta = payment.metadata;
   return meta?.purpose === "ppv_purchase";
+}
+
+function isMessagePpvPayment(payment: {
+  type?: string | null;
+  message_id?: string | null;
+  metadata: Record<string, unknown>;
+}): boolean {
+  if (payment.metadata?.purpose === "message_ppv_purchase") return true;
+  return payment.type === "ppv" && Boolean(payment.message_id);
 }
 
 /**
@@ -69,6 +87,13 @@ export async function verifyAndFulfillPayment(
       metadata: Record<string, unknown>;
     },
   );
+  const messagePpv = isMessagePpvPayment(
+    payment as {
+      type?: string | null;
+      message_id?: string | null;
+      metadata: Record<string, unknown>;
+    },
+  );
 
   if (payment.status === "success" && ppv) {
     const postId =
@@ -82,6 +107,24 @@ export async function verifyAndFulfillPayment(
         status: "success",
         kind: "ppv",
         postId,
+        paymentId: payment.id,
+        reference: input.reference,
+      };
+    }
+  }
+
+  if (payment.status === "success" && messagePpv) {
+    const messageId =
+      typeof (payment as { message_id?: string }).message_id === "string"
+        ? (payment as { message_id: string }).message_id
+        : typeof payment.metadata.message_id === "string"
+          ? payment.metadata.message_id
+          : null;
+    if (messageId) {
+      return {
+        status: "success",
+        kind: "message_ppv",
+        messageId,
         paymentId: payment.id,
         reference: input.reference,
       };
@@ -161,6 +204,36 @@ export async function verifyAndFulfillPayment(
       status: "failed",
       reference: input.reference,
       reason: "Payment amount does not match checkout.",
+    };
+  }
+
+  if (messagePpv) {
+    const handled = await fulfillMessagePpvPurchase(admin, {
+      chargeData: transaction as unknown as Record<string, unknown>,
+      requestId: input.requestId,
+    });
+
+    if (!handled) {
+      return {
+        status: "failed",
+        reference: input.reference,
+        reason: "Payment succeeded but could not unlock this message.",
+      };
+    }
+
+    const messageId =
+      typeof payment.metadata.message_id === "string"
+        ? payment.metadata.message_id
+        : typeof (payment as { message_id?: string }).message_id === "string"
+          ? (payment as { message_id: string }).message_id
+          : "";
+
+    return {
+      status: "success",
+      kind: "message_ppv",
+      messageId,
+      paymentId: payment.id,
+      reference: input.reference,
     };
   }
 

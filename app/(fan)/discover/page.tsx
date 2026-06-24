@@ -1,13 +1,13 @@
 import Link from "next/link";
 
-import { CreatorCard } from "@/components/creator/creator-card";
+import { CreatorGrid } from "@/components/creator/creator-grid";
 import { PostCard } from "@/components/posts/post-card";
 import { SuggestedCreators } from "@/components/recommendations/suggested-creators";
 import { EmptyState } from "@/components/shared/empty-state";
 import { getAuthContext } from "@/lib/auth/get-auth-context";
 import { CREATOR_CATEGORIES } from "@/lib/creators/categories";
 import { buildWatermarkLabel } from "@/lib/media/watermark";
-import { listCreators } from "@/lib/creators/queries";
+import { listCreatorsPage } from "@/lib/creators/queries";
 import {
   listTrendingHashtags,
   listTrendingPosts,
@@ -156,8 +156,8 @@ export default async function DiscoverPage({ searchParams }: PageProps) {
 
   const isFiltering = Boolean(q?.trim() || cat);
 
-  const [creators, suggestedCreators] = await Promise.all([
-    listCreators(supabase, {
+  const [creatorPage, suggestedCreators] = await Promise.all([
+    listCreatorsPage(supabase, {
       limit: 24,
       search: q?.trim() || undefined,
       category: cat || undefined,
@@ -166,6 +166,7 @@ export default async function DiscoverPage({ searchParams }: PageProps) {
       ? getRecommendedCreators(supabase, viewerId, 8)
       : Promise.resolve([]),
   ]);
+  const { creators } = creatorPage;
 
   const activeCategory = CREATOR_CATEGORIES.find((c) => c.value === cat);
 
@@ -289,11 +290,13 @@ export default async function DiscoverPage({ searchParams }: PageProps) {
             {activeCategory ? ` in ${activeCategory.label}` : ""}
             {q ? ` matching "${q}"` : ""}
           </p>
-          <div className="mt-4 grid gap-6 sm:grid-cols-2">
-            {creators.map((creator) => (
-              <CreatorCard key={creator.user_id} creator={creator} />
-            ))}
-          </div>
+          <CreatorGrid
+            initialCreators={creators}
+            initialCursor={creatorPage.nextCursor}
+            initialHasMore={creatorPage.hasMore}
+            search={q?.trim() || undefined}
+            category={cat || undefined}
+          />
         </>
       )}
     </div>

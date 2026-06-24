@@ -117,14 +117,29 @@ export async function getStoryGroups(
 ): Promise<StoryGroup[]> {
   const now = new Date().toISOString();
 
-  // Public stories + stories from subscribed creators
+  // Subscribed creators must be known up front so subscriber-only stories
+  // from them are actually included in the initial fetch below.
+  const subscribedCreators = new Set<string>();
+  if (viewerId) {
+    const { data: subs } = await supabase
+      .from("subscriptions")
+      .select("creator_id")
+      .eq("fan_id", viewerId)
+      .in("status", ["active", "trialing"]);
+    (subs ?? []).forEach((s) => subscribedCreators.add(s.creator_id));
+  }
+
+  // Public stories + stories from subscribed creators + the viewer's own.
+  // No `profiles!inner` embed here — `posts.creator_id` only reaches
+  // `profiles` via `creator_profiles`, and `post_likes`/`story_views` add
+  // further many-to-many paths, so PostgREST can't auto-pick one (PGRST201).
+  // Profiles are fetched separately below instead.
   let query = supabase
     .from("posts")
     .select(
       `id, creator_id, type, caption, expires_at, created_at,
        visibility,
-       post_media!left (r2_key, stream_uid, media_type, sort_order, media_upload_id),
-       profiles!inner (id, username, display_name, avatar_url)`,
+       post_media!left (r2_key, stream_uid, media_type, sort_order, media_upload_id)`,
     )
     .eq("is_story", true)
     .eq("status", "published")
@@ -133,9 +148,9 @@ export async function getStoryGroups(
     .limit(100);
 
   if (viewerId) {
-    // Stories from subscribed creators OR public stories
+    const allowedCreatorIds = [viewerId, ...subscribedCreators];
     query = query.or(
-      `visibility.eq.public,creator_id.in.(${viewerId})`,
+      `visibility.eq.public,creator_id.in.(${allowedCreatorIds.join(",")})`,
     );
   } else {
     query = query.eq("visibility", "public");
@@ -157,16 +172,12 @@ export async function getStoryGroups(
     (views ?? []).forEach((v) => viewedSet.add(v.story_id));
   }
 
-  // Also check subscription for subscriber-only stories
-  const subscribedCreators = new Set<string>();
-  if (viewerId) {
-    const { data: subs } = await supabase
-      .from("subscriptions")
-      .select("creator_id")
-      .eq("fan_id", viewerId)
-      .in("status", ["active", "trialing"]);
-    (subs ?? []).forEach((s) => subscribedCreators.add(s.creator_id));
-  }
+  const creatorIds = [...new Set(posts.map((p) => p.creator_id))];
+  const { data: profileRows } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, avatar_url")
+    .in("id", creatorIds);
+  const profileById = new Map((profileRows ?? []).map((p) => [p.id, p]));
 
   // Group by creator
   const groupMap = new Map<string, StoryGroup>();
@@ -181,9 +192,7 @@ export async function getStoryGroups(
       continue;
     }
 
-    const profile = Array.isArray(post.profiles)
-      ? post.profiles[0]
-      : post.profiles;
+    const profile = profileById.get(post.creator_id);
     if (!profile) continue;
 
     const media = Array.isArray(post.post_media) ? post.post_media[0] : null;

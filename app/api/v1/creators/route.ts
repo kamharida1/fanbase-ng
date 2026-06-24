@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { listCreators } from "@/lib/creators/queries";
+import { listCreatorsPage } from "@/lib/creators/queries";
 import { enforceRateLimit } from "@/lib/rate-limit-http";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,9 +14,11 @@ export async function GET(request: Request) {
     50,
   );
   const search = searchParams.get("q") ?? undefined;
+  const category = searchParams.get("cat") ?? undefined;
+  const cursor = searchParams.get("cursor");
 
   const supabase = await createClient();
-  const creators = await listCreators(supabase, { limit, search });
+  const page = await listCreatorsPage(supabase, { limit, search, category, cursor });
 
-  return NextResponse.json({ data: creators });
+  return NextResponse.json({ data: page });
 }
